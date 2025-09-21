@@ -1,0 +1,6 @@
+﻿node_modules
+.git
+.github
+.memorial
+.next/cache
+Dockerfile
