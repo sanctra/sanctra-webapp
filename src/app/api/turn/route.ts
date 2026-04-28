@@ -1,10 +1,10 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const base = process.env.NEXT_PUBLIC_ORCHESTRATOR_HTTP;
   if (!base) return NextResponse.json({ error: "missing orchestrator" }, { status: 500 });
   const body = await req.json();
-  const res = await fetch(`${base}/turn/text`, {
+  const res = await fetch(`${base}/turn`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),

@@ -1,7 +1,14 @@
-﻿export async function openMicStream(sessionId: string): Promise<WebSocket> {
+const DEFAULT_PERSON_ID = process.env.NEXT_PUBLIC_PERSON_ID || "default_person";
+
+export async function openMicStream(
+  sessionId: string,
+  personId: string = DEFAULT_PERSON_ID,
+): Promise<WebSocket> {
   const wsBase = process.env.NEXT_PUBLIC_ORCHESTRATOR_WS;
   if (!wsBase) throw new Error("Missing NEXT_PUBLIC_ORCHESTRATOR_WS");
-  const ws = new WebSocket(`${wsBase}/turn/stream?session_id=${encodeURIComponent(sessionId)}`);
+  const ws = new WebSocket(
+    `${wsBase}/turn/stream?session_id=${encodeURIComponent(sessionId)}&person_id=${encodeURIComponent(personId)}`,
+  );
 
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 48000 }, video: false });
   const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 128000 });

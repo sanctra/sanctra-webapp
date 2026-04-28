@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -29,7 +29,8 @@ export default function HomePage() {
         if (evt.type === "wav_url" && evt.url) setWavUrl(evt.url);
         if (evt.type === "video_url" && evt.url) setMp4Url(evt.url);
         if (evt.type === "agent_text" && evt.text) {
-          setMessages((m) => [...m, { role: "agent", text: evt.text }]);
+          const text = evt.text;
+          setMessages((m) => [...m, { role: "agent", text }]);
         }
       });
     })();
