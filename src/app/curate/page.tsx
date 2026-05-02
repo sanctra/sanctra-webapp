@@ -133,7 +133,7 @@ export default function CuratePage() {
           <h1>Build a memorial package before upload/processing</h1>
           <p className={styles.subtitle}>Sanctra now starts with consent, prompts, relationship context, and mocked modality state. Bulk upload and sanitation stay out of this first slice.</p>
         </div>
-        <nav className={styles.nav}><Link href="/">Session</Link><Link href="/dataset">Dataset packet</Link></nav>
+        <nav className={styles.nav}><Link href="/">Session</Link><Link href="/dataset">Dataset packet</Link><Link href="/upload">Bulk upload</Link></nav>
       </header>
 
       <section className={styles.laneGrid} aria-label="Choose curation lane">

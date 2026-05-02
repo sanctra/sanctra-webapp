@@ -1,0 +1,41 @@
+
+.shell { max-width: 1240px; margin: 0 auto; padding: 32px 20px 60px; color: var(--sanctra-ink); }
+.header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
+.header h1 { margin: 0; max-width: 760px; font-size: clamp(34px, 5vw, 58px); line-height: 1; letter-spacing: -.045em; }
+.kicker { margin: 0 0 8px; color: var(--sanctra-muted); font-size: 12px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+.subtitle, .sidebar p, .metaBlock p { color: var(--sanctra-muted); line-height: 1.55; }
+.nav { display: flex; gap: 12px; flex-wrap: wrap; font-weight: 850; }
+.nav a { color: var(--sanctra-primary-strong); text-decoration: none; }
+.lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.laneCard, .sidebar, .card { border: 1px solid var(--sanctra-line); border-radius: 24px; background: color-mix(in srgb, var(--sanctra-surface) 92%, white); box-shadow: var(--sanctra-shadow); }
+.laneCard { text-align: left; padding: 20px; color: var(--sanctra-ink); cursor: pointer; }
+.laneCard span { color: var(--sanctra-muted); font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
+.laneCard strong { display: block; margin-top: 8px; font-size: 22px; }
+.laneCard p { color: var(--sanctra-muted); line-height: 1.55; margin-bottom: 0; }
+.selected { outline: 3px solid rgba(111,77,56,.28); border-color: var(--sanctra-primary); }
+.workspace { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; align-items: start; }
+.sidebar { position: sticky; top: 18px; padding: 18px; }
+.sidebar h2 { margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+.stats span { border: 1px solid var(--sanctra-line); border-radius: 16px; padding: 12px; color: var(--sanctra-muted); background: rgba(255,255,255,.55); }
+.stats strong { display: block; color: var(--sanctra-ink); font-size: 24px; }
+.notice { margin: 16px 0; border: 1px dashed var(--sanctra-line); border-radius: 18px; padding: 16px; background: rgba(255,255,255,.55); color: var(--sanctra-muted); line-height: 1.5; }
+.notice strong { display: block; color: var(--sanctra-ink); margin-bottom: 6px; }
+.notice ul { padding-left: 18px; margin: 8px 0 0; }
+.primary { width: 100%; border: 0; border-radius: 999px; padding: 13px 18px; background: var(--sanctra-primary); color: white; font-weight: 900; cursor: pointer; }
+.saved { border-radius: 14px; padding: 12px; background: #edf7f1; color: var(--sanctra-safe) !important; font-weight: 800; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card { padding: 18px; }
+.cardTopline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.modality { color: var(--sanctra-muted); font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
+.pill { border: 1px solid var(--sanctra-line); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 850; }
+.ready { color: var(--sanctra-safe); background: #edf7f1; border-color: #b8d9c5; }
+.needs_review { color: var(--sanctra-warn); background: #fff3df; border-color: #edc98c; }
+.quarantined { color: var(--sanctra-danger); background: #fff0ef; border-color: #e6b3b0; }
+.dropZone { display: grid; gap: 8px; border: 1px dashed var(--sanctra-line); border-radius: 18px; padding: 16px; background: #fffdf8; color: var(--sanctra-muted); cursor: pointer; }
+.dropZone strong { color: var(--sanctra-ink); }
+.field { display: grid; gap: 8px; margin: 14px 0; color: var(--sanctra-muted); font-size: 13px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
+.field textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--sanctra-line); border-radius: 16px; padding: 12px; background: rgba(255,255,255,.72); color: var(--sanctra-ink); font: inherit; resize: vertical; text-transform: none; letter-spacing: 0; }
+.metaBlock { border-top: 1px solid var(--sanctra-line); padding-top: 12px; margin-top: 12px; }
+.metaBlock strong { color: var(--sanctra-ink); }
+@media (max-width: 900px) { .header, .lanes, .workspace, .grid { display: grid; grid-template-columns: 1fr; } .sidebar { position: static; } }
