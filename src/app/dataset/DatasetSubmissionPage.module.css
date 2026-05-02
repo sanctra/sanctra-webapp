@@ -165,6 +165,48 @@
   line-height: 1.45;
 }
 
+.stepList {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stepItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid #eadfce;
+  border-radius: 18px;
+  background: rgba(255,255,255,.55);
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #6f4d38;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.stepTitle {
+  margin: 0;
+  color: #2d2520;
+  font-weight: 800;
+}
+
+.stepDetail {
+  margin: 4px 0 0;
+  color: #74685f;
+  line-height: 1.55;
+}
+
 .prepareList {
   color: #74685f;
   line-height: 1.6;

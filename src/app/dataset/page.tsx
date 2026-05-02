@@ -7,6 +7,7 @@ import styles from "./DatasetSubmissionPage.module.css";
 type Lane = "self" | "family";
 type FieldKey = "subjectName" | "submitterName" | "relationship" | "contact" | "authority" | "sourceMaterials" | "contextNotes" | "preferences";
 type Draft = Record<FieldKey, string> & { consent: boolean; storage: boolean };
+type PacketStep = { title: string; detail: string };
 
 const emptyDraft: Draft = {
   subjectName: "",
@@ -47,6 +48,21 @@ const laneCopy: Record<Lane, { label: string; subtitle: string; prepare: string[
 };
 
 const storageKey = "sanctra-demo-dataset-submissions";
+
+const packetSteps: PacketStep[] = [
+  {
+    title: "Complete the packet in this local UI",
+    detail: "Capture identity, authority, source inventory, context, boundaries, and contact preferences for either self-submission or family/authorized submission.",
+  },
+  {
+    title: "Gather the controlled-storage references",
+    detail: "Keep media outside this demo page. The later real-data step needs reviewed storage locations or upload targets rather than direct provider calls from the browser.",
+  },
+  {
+    title: "Hand off for bounded preflight review",
+    detail: "Once the packet is complete, the next step is a no-provider preflight/import pass so Sanctra can validate the packet before any live memorial artifact work resumes.",
+  },
+];
 
 function requiredComplete(draft: Draft) {
   return Boolean(
@@ -141,6 +157,22 @@ export default function DatasetSubmissionPage() {
         <form className={styles.card} onSubmit={submit}>
           <h2>2. Packet details</h2>
           <p className={styles.subtitle}>All fields are required so the future backend contract can separate identity, authority, materials, context, contact, and storage review.</p>
+          <div className={styles.notice}>
+            <strong>Submission boundary</strong>
+            This page intentionally stops before any production upload or provider call. Saving here creates a local browser draft only, so Patrick can prepare a complete packet without needing secrets or live storage access during intake.
+          </div>
+
+          <div className={styles.stepList} aria-label="Submission packet steps">
+            {packetSteps.map((step, index) => (
+              <div key={step.title} className={styles.stepItem}>
+                <span className={styles.stepNumber}>{index + 1}</span>
+                <div>
+                  <p className={styles.stepTitle}>{step.title}</p>
+                  <p className={styles.stepDetail}>{step.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
 
           <TextField id="subjectName" label="Subject identity" value={draft.subjectName} onChange={update} placeholder="Preferred/legal name and any identifiers for the test packet" />
           <TextField id="submitterName" label="Submitter identity" value={draft.submitterName} onChange={update} placeholder="Who is preparing this packet" />
@@ -175,6 +207,10 @@ export default function DatasetSubmissionPage() {
         <aside className={styles.card}>
           <h2>What Patrick should prepare</h2>
           <p className={styles.subtitle}>Use this checklist before submitting himself or a family-authorized packet through the intended flow.</p>
+          <div className={styles.notice}>
+            <strong>What remains after this page</strong>
+            After Patrick saves a complete packet, the remaining real-data step is controlled-storage review plus the bounded local preflight/import sequence. No realtime, live-avatar, or uncontrolled external upload is part of this intake lane.
+          </div>
           <div className={styles.chipRow}>
             <span className={`${styles.chip} ${styles.ready}`}>Identity</span>
             <span className={`${styles.chip} ${styles.ready}`}>Consent / authority</span>
