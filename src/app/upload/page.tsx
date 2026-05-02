@@ -7,7 +7,7 @@ import styles from "./UploadPage.module.css";
 
 type Lane = "self" | "family";
 type Modality = "text" | "audio" | "image" | "video";
-type ReviewState = "ready" | "needs_review" | "quarantined";
+type ReviewState = "accepted" | "quarantined" | "rejected";
 
 type UploadItem = {
   id: string;
@@ -18,6 +18,7 @@ type UploadItem = {
   reviewState: ReviewState;
   provenance: string;
   consent: string;
+  reviewReason: string;
 };
 
 const laneCopy: Record<Lane, { eyebrow: string; title: string; summary: string; authority: string; warnings: string[] }> = {
@@ -44,14 +45,14 @@ const laneCopy: Record<Lane, { eyebrow: string; title: string; summary: string; 
 };
 
 const modalityItems: UploadItem[] = [
-  { id: "text-memory", modality: "text", label: "Text memories and writings", cue: "Stories, values, phrases, letters, eulogies, journals, or curated prompt responses.", acceptedTypes: ".txt, .md, .pdf, .docx", reviewState: "ready", provenance: "Author/date/source note required; private names can be redacted before package reuse.", consent: "Private memorial and relationship-context reuse can proceed only inside stated consent scope." },
-  { id: "audio-voice", modality: "audio", label: "Audio voice samples", cue: "Clean single-speaker voice clips, guided curation recordings, interviews, or archive snippets.", acceptedTypes: ".wav, .mp3, .m4a, .flac", reviewState: "needs_review", provenance: "Recorder, date, speaker identity, background speakers/music, and transcript status required.", consent: "Voice likeness is staged separately from text reuse; no clone/training handoff without reviewer approval." },
-  { id: "image-reference", modality: "image", label: "Image references", cue: "Portraits, everyday appearance, family-approved photos, and likeness references.", acceptedTypes: ".jpg, .jpeg, .png, .webp, .heic", reviewState: "needs_review", provenance: "Photographer/source, date/context, visible third parties, minors, and derivative crop intent required.", consent: "Original is preserved; face crop or avatar reference is a later derivative job after privacy review." },
-  { id: "video-reference", modality: "video", label: "Video references", cue: "Short clips with gesture, face, voice, eyeline, consent statement, or archive context.", acceptedTypes: ".mp4, .mov, .webm", reviewState: "quarantined", provenance: "Scene context, speaker confidence, third parties, music, transcript/extraction status, and clip owner required.", consent: "Video is quarantined by default until explicit likeness, privacy, and quality gates exist." },
+  { id: "text-memory", modality: "text", label: "Text memories and writings", cue: "Stories, values, phrases, letters, eulogies, journals, or curated prompt responses.", acceptedTypes: ".txt, .md, .pdf, .docx", reviewState: "accepted", provenance: "Author/date/source note required; private names can be redacted before package reuse.", consent: "Private memorial and relationship-context reuse can proceed only inside stated consent scope.", reviewReason: "Reviewer accepted text for package metadata reuse after consent/provenance check." },
+  { id: "audio-voice", modality: "audio", label: "Audio voice samples", cue: "Clean single-speaker voice clips, guided curation recordings, interviews, or archive snippets.", acceptedTypes: ".wav, .mp3, .m4a, .flac", reviewState: "quarantined", provenance: "Recorder, date, speaker identity, background speakers/music, and transcript status required.", consent: "Voice likeness is staged separately from text reuse; no clone/training handoff without reviewer approval.", reviewReason: "Quarantined until explicit likeness consent, single-speaker confidence, and quality notes are reviewed." },
+  { id: "image-reference", modality: "image", label: "Image references", cue: "Portraits, everyday appearance, family-approved photos, and likeness references.", acceptedTypes: ".jpg, .jpeg, .png, .webp, .heic", reviewState: "accepted", provenance: "Photographer/source, date/context, visible third parties, minors, and derivative crop intent required.", consent: "Original is preserved; face crop or avatar reference is a later derivative job after privacy review.", reviewReason: "Accepted as metadata-only visual reference; derivative crop stays outside this slice." },
+  { id: "video-reference", modality: "video", label: "Video references", cue: "Short clips with gesture, face, voice, eyeline, consent statement, or archive context.", acceptedTypes: ".mp4, .mov, .webm", reviewState: "rejected", provenance: "Scene context, speaker confidence, third parties, music, transcript/extraction status, and clip owner required.", consent: "Video is excluded unless explicit likeness, privacy, and quality gates exist.", reviewReason: "Rejected example shows no package reuse when third-party privacy and video-likeness authority are unresolved." },
 ];
 
 function stateLabel(state: ReviewState) {
-  return state === "needs_review" ? "needs human review" : state;
+  return state;
 }
 
 export default function UploadPage() {
@@ -62,9 +63,9 @@ export default function UploadPage() {
   const copy = laneCopy[lane];
   const stagedCount = useMemo(() => Object.values(selected).reduce((sum, count) => sum + count, 0), [selected]);
   const reviewCounts = useMemo(() => ({
-    ready: modalityItems.filter((item) => item.reviewState === "ready").length,
-    needsReview: modalityItems.filter((item) => item.reviewState === "needs_review").length,
+    accepted: modalityItems.filter((item) => item.reviewState === "accepted").length,
     quarantined: modalityItems.filter((item) => item.reviewState === "quarantined").length,
+    rejected: modalityItems.filter((item) => item.reviewState === "rejected").length,
   }), []);
 
   const saveManifest = () => {
@@ -79,13 +80,24 @@ export default function UploadPage() {
         review_required: true,
         conflict_policy: lane === "self" ? "Subject revocation pauses reuse immediately." : "Family conflict pauses release and routes to human review.",
       },
+      review_contract: {
+        allowed_states: ["accepted", "quarantined", "rejected"],
+        default_state: "quarantined",
+        processor_boundary: "Upload handoff records metadata and reviewer disposition only; processor/sanitation internals are not started in this slice.",
+        state_definitions: [
+          { state: "accepted", meaning: "Authority, provenance, consent scope, and privacy checks are sufficient for package metadata reuse.", reusable_for_package: true, next_action: "May enter package metadata; derivative work still requires later scoped jobs." },
+          { state: "quarantined", meaning: "Preserve external reference but block reuse until missing review evidence is resolved.", reusable_for_package: false, next_action: "Collect authority, identity, privacy, or quality evidence without processing raw media." },
+          { state: "rejected", meaning: "Exclude from package reuse because consent/provenance/privacy/quality requirements failed.", reusable_for_package: false, next_action: "Keep only audit metadata required for accountability and revocation history." },
+        ],
+      },
       staged_items: modalityItems.map((item) => ({
         modality: item.modality,
         upload_slot_id: item.id,
         selected_file_count: selected[item.id] || 0,
-        review_state: item.reviewState === "needs_review" ? "needs_human_review" : item.reviewState,
+        review_state: item.reviewState,
         provenance_requirement: item.provenance,
         consent_requirement: item.consent,
+        review_reason: item.reviewReason,
         sanitation_status: "not_started_follow_up_slice",
         operator_note: notes[item.id] || "",
       })),
@@ -126,9 +138,9 @@ export default function UploadPage() {
           <p>{copy.authority}</p>
           <div className={styles.stats}>
             <span><strong>{stagedCount}</strong> files selected locally</span>
-            <span><strong>{reviewCounts.ready}</strong> ready slot</span>
-            <span><strong>{reviewCounts.needsReview}</strong> review slots</span>
-            <span><strong>{reviewCounts.quarantined}</strong> quarantine slot</span>
+            <span><strong>{reviewCounts.accepted}</strong> accepted slots</span>
+            <span><strong>{reviewCounts.quarantined}</strong> quarantined slot</span>
+            <span><strong>{reviewCounts.rejected}</strong> rejected slot</span>
           </div>
           <div className={styles.notice}>
             <strong>Consent/provenance cues</strong>
@@ -158,6 +170,7 @@ export default function UploadPage() {
               </label>
               <div className={styles.metaBlock}><strong>Provenance</strong><p>{item.provenance}</p></div>
               <div className={styles.metaBlock}><strong>Consent</strong><p>{item.consent}</p></div>
+              <div className={styles.metaBlock}><strong>Review reason</strong><p>{item.reviewReason}</p></div>
             </article>
           ))}
         </section>

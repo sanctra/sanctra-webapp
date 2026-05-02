@@ -29,9 +29,9 @@
 .cardTopline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .modality { color: var(--sanctra-muted); font-size: 12px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
 .pill { border: 1px solid var(--sanctra-line); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 850; }
-.ready { color: var(--sanctra-safe); background: #edf7f1; border-color: #b8d9c5; }
-.needs_review { color: var(--sanctra-warn); background: #fff3df; border-color: #edc98c; }
+.accepted { color: var(--sanctra-safe); background: #edf7f1; border-color: #b8d9c5; }
 .quarantined { color: var(--sanctra-danger); background: #fff0ef; border-color: #e6b3b0; }
+.rejected { color: #6f1d1b; background: #f8e3df; border-color: #d99890; }
 .dropZone { display: grid; gap: 8px; border: 1px dashed var(--sanctra-line); border-radius: 18px; padding: 16px; background: #fffdf8; color: var(--sanctra-muted); cursor: pointer; }
 .dropZone strong { color: var(--sanctra-ink); }
 .field { display: grid; gap: 8px; margin: 14px 0; color: var(--sanctra-muted); font-size: 13px; font-weight: 850; text-transform: uppercase; letter-spacing: .08em; }
