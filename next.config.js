@@ -1,5 +1,6 @@
 ﻿/** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: { externalDir: true },
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
