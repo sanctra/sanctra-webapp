@@ -2,95 +2,122 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import audioProtocol from "../../../../async-memorial-package-scaffold/examples/guided-curation-audio-prompt-protocol.example.json";
+import governanceSummary from "../../../../async-memorial-package-scaffold/examples/curation-governance-prototype-summary.example.json";
+import imageProtocol from "../../../../async-memorial-package-scaffold/examples/guided-curation-image-prompt-protocol.example.json";
+import prototypeFlow from "../../../../async-memorial-package-scaffold/examples/guided-curation-prototype-flow.example.json";
+import textProtocol from "../../../../async-memorial-package-scaffold/examples/guided-curation-text-prompt-protocol.example.json";
+import videoProtocol from "../../../../async-memorial-package-scaffold/examples/guided-curation-video-prompt-protocol.example.json";
 import styles from "./CuratePage.module.css";
 
-type Lane = "self" | "family";
 type StepKey = "consent" | "text" | "audio" | "image" | "video" | "review";
-type PromptStatus = "draft" | "captured" | "submitted" | "approved_with_limits" | "quarantined" | "revoked";
-type PromptCard = {
-  id: string;
-  step: Exclude<StepKey, "consent" | "review">;
-  title: string;
-  prompt: string;
-  guidance: string;
-  status: PromptStatus;
-  privacy: "private" | "family" | "excluded";
-  quality: string;
+type LaneKey = "living_subject_guided" | "family_archive_guided";
+type Modality = Exclude<StepKey, "consent" | "review">;
+type UiResponseState = "answered" | "skipped" | "private_only" | "excluded_from_training" | "needs_review";
+
+type ProtocolCard = {
+  prompt_id: string;
+  prompt_text: string;
+  target_modality?: Modality;
+  expected_response_state?: string;
+  elicitation_goal?: string;
+  guidance?: string;
+  safety_notes?: string;
 };
 
-type ConsentControl = {
-  label: string;
-  scope: string;
-  state: "allowed" | "limited" | "blocked";
+type PromptCard = ProtocolCard & {
+  modality: Modality | "review";
+  responseState: UiResponseState;
+  rawState: string;
+  requiresReview: boolean;
 };
 
-const steps: Array<{ key: StepKey; label: string; helper: string }> = [
-  { key: "consent", label: "Consent", helper: "Artifact, modality, use-case, revocation" },
-  { key: "text", label: "Text", helper: "Values, stories, boundaries, everyday voice" },
-  { key: "audio", label: "Audio", helper: "Natural cadence and expressive range" },
-  { key: "image", label: "Image", helper: "Reference likeness without destructive edits" },
-  { key: "video", label: "Video", helper: "Gestures, eye line, consent reminder" },
-  { key: "review", label: "Review", helper: "Coverage, reuse scope, blocked gaps" },
-];
+const protocols = [textProtocol, audioProtocol, imageProtocol, videoProtocol] as const;
+const lanes = prototypeFlow.lanes as Array<{ lane: LaneKey; label: string; progress_steps: StepKey[] }>;
+const livingSubjectLane = lanes.find((lane) => lane.lane === "living_subject_guided") ?? lanes[0];
+const governance = governanceSummary as typeof governanceSummary;
 
-const laneCopy: Record<Lane, { title: string; description: string; authority: string; warning: string }> = {
-  self: {
-    title: "I am creating my own avatar",
-    description: "A living subject contributes their own memories, media, consent, and limits before anything enters model preparation.",
-    authority: "Subject-authored consent controls every reusable artifact and can be revoked later.",
-    warning: "The prototype saves mocked state only; real capture/storage comes after governance validation.",
+const stepCopy: Record<StepKey, { label: string; helper: string }> = {
+  consent: { label: "Consent", helper: "Authority, audience, revocation, stop conditions" },
+  text: { label: "Text", helper: "Values, stories, boundaries, ordinary voice" },
+  audio: { label: "Audio", helper: "Mocked recordings; high-presence review" },
+  image: { label: "Image", helper: "Placeholder references; no raw media" },
+  video: { label: "Video", helper: "Consent reminders; quarantine-first" },
+  review: { label: "Review", helper: "Readiness gaps, stop conditions, next handoff" },
+};
+
+const laneDescriptions: Record<LaneKey, { description: string; authority: string; warning: string }> = {
+  living_subject_guided: {
+    description: "Patrick-as-living-subject pilot capture starts from subject-self authority, private-review audience, explicit consent, and prompt-card coverage before any ingest.",
+    authority: "Subject-self authority, package-level consent, audience profile, revocation acknowledgement, and stop-condition acknowledgement are required before accepted pilot ingest.",
+    warning: "Synthetic/local fixture only: no provider calls, no model training, no public delivery, no raw private media in repo.",
   },
-  family: {
-    title: "I am submitting family materials",
-    description: "A family member or authorized helper inventories archival material while authority, privacy, and family-review limits stay explicit.",
-    authority: "Every item needs submitter authority, subject identity confidence, third-party privacy review, and conflict handling.",
-    warning: "Archive upload and sanitation are follow-up slices; this screen only proves the guided curation flow.",
+  family_archive_guided: {
+    description: "Family/archive submission stays visible as a later lane, but this slice prioritizes the living-subject pilot and its stricter privacy gate.",
+    authority: "Family materials require submitter authority, subject identity confidence, third-party privacy review, and conflict handling before reuse.",
+    warning: "Archive upload and sanitation remain follow-up slices; this route keeps mocked/local state only.",
   },
 };
 
-const baseConsent: ConsentControl[] = [
-  { label: "Text memories", scope: "private family memorial + evaluation", state: "allowed" },
-  { label: "Voice likeness", scope: "private prototype only; no public examples", state: "limited" },
-  { label: "Video likeness", scope: "review blocked until explicit approval", state: "blocked" },
-  { label: "Training reuse", scope: "disabled until final package review", state: "blocked" },
-  { label: "Revocation", scope: "original, derivative, model-prep record, and generated artifacts", state: "allowed" },
-];
+const requiredRecords = ["subject-self authority record", "package-level consent grant", "private-review audience profile", "revocation acknowledgement", "stop-condition acknowledgement"];
+const stopConditions = ["no provider calls", "no model training", "no public delivery", "no raw private media in repo"];
 
-const selfPrompts: PromptCard[] = [
-  { id: "text-values", step: "text", title: "Values and principles", prompt: "What principles did you try to live by, even when it was hard?", guidance: "Write naturally; include phrases or sayings people associate with you.", status: "captured", privacy: "family", quality: "Good style signal; needs review before training reuse." },
-  { id: "text-boundaries", step: "text", title: "Non-impersonation boundaries", prompt: "What should this avatar never say, imply, or pretend to know?", guidance: "Include no-current-awareness limits, topics to refuse, and people/situations to avoid.", status: "submitted", privacy: "private", quality: "Required guardrail prompt captured." },
-  { id: "audio-reassurance", step: "audio", title: "Comfort in your own voice", prompt: "Speak to someone you love who is grieving, scared, or unsure.", guidance: "Quiet room, no music, 30–90 seconds, natural pauses. Mocked recorder state only.", status: "approved_with_limits", privacy: "family", quality: "Enough for cadence demo; not enough for voice clone threshold." },
-  { id: "image-front", step: "image", title: "Everyday front-facing reference", prompt: "Add a clear portrait with normal hairstyle, glasses, and expression.", guidance: "Original preserved; derivative crop/review job would be separate.", status: "draft", privacy: "private", quality: "Image capture waiting on real storage seam." },
-  { id: "video-greeting", step: "video", title: "Warm greeting clip", prompt: "Record a short greeting and repeat what uses are allowed.", guidance: "Stable camera, good light, quiet room, no copyrighted background media.", status: "quarantined", privacy: "excluded", quality: "Quarantined until explicit video consent and quality gates exist." },
-];
-
-const familyPrompts: PromptCard[] = [
-  { id: "text-authority", step: "text", title: "Authority and relationship note", prompt: "Who are you to the subject, and what authority or family agreement lets you submit this?", guidance: "Name limitations, dissent, and who can approve or revoke.", status: "captured", privacy: "private", quality: "Authority basis captured; would require reviewer confirmation." },
-  { id: "text-relationship", step: "text", title: "Relationship-specific context", prompt: "For each intended person, what would they need to hear and what should never be said to them?", guidance: "Separate private, shared-family, and excluded context.", status: "submitted", privacy: "family", quality: "Good relationship fixture; needs conflict review." },
-  { id: "audio-archive", step: "audio", title: "Archive voice inventory", prompt: "List clean voice clips, source dates, other speakers, and any background music/noise.", guidance: "Do not upload files here; describe controlled-storage candidates.", status: "draft", privacy: "private", quality: "Waiting for controlled packet; no provider calls." },
-  { id: "image-archive", step: "image", title: "Photo provenance inventory", prompt: "Which images represent the subject clearly and who else appears in them?", guidance: "Flag minors, third parties, private events, and disputed images.", status: "captured", privacy: "family", quality: "Provenance metadata starts here; derivative crop later." },
-  { id: "video-archive", step: "video", title: "Video identity confidence", prompt: "Inventory short clips with face, voice, date/context, and speaker confidence.", guidance: "Preserve originals; any segments/transcripts are derivative jobs.", status: "draft", privacy: "private", quality: "Insufficient for video readiness without reviewer packet." },
-];
-
-function statusLabel(status: PromptStatus) {
-  return status.replaceAll("_", " ");
+function responseState(rawState: string, modality: PromptCard["modality"]): UiResponseState {
+  if (rawState === "draft") return "skipped";
+  if (["quarantined", "identity_review_needed", "derivative_pending"].includes(rawState)) return "needs_review";
+  if (["approved_with_limits", "inventory_only"].includes(rawState)) return "private_only";
+  if (["revoked", "rejected"].includes(rawState)) return "excluded_from_training";
+  if (["audio", "image", "video"].includes(modality)) return "needs_review";
+  return "answered";
 }
 
-function statusClass(status: PromptStatus) {
-  if (status === "captured" || status === "submitted") return styles.ready;
-  if (status === "approved_with_limits") return styles.limited;
-  if (status === "quarantined" || status === "revoked") return styles.blocked;
+function stateLabel(state: string) {
+  return state.replaceAll("_", " ");
+}
+
+function stateClass(state: UiResponseState) {
+  if (state === "answered") return styles.ready;
+  if (state === "private_only") return styles.limited;
+  if (state === "needs_review" || state === "excluded_from_training") return styles.blocked;
   return styles.draft;
 }
 
-function Toggle({ control }: { control: ConsentControl }) {
+function titleFromId(id: string) {
+  return id.replace(/^prompt:/, "").replace(/_\d+$/, "").replaceAll("_", " ");
+}
+
+function protocolCards(): PromptCard[] {
+  const modalityCards = protocols.flatMap((protocol) => protocol.prompt_protocol.cards.map((card) => {
+    const typedCard = card as ProtocolCard;
+    const modality = typedCard.target_modality as Modality;
+    const rawState = typedCard.expected_response_state ?? "draft";
+    return {
+      ...typedCard,
+      modality,
+      rawState,
+      responseState: responseState(rawState, modality),
+      requiresReview: ["audio", "image", "video"].includes(modality),
+    } satisfies PromptCard;
+  }));
+
+  const reviewCards = prototypeFlow.prompt_cards.map((card) => ({
+    ...card,
+    modality: "review" as const,
+    rawState: "needs_review",
+    responseState: "needs_review" as const,
+    guidance: card.elicitation_goal,
+    safety_notes: card.safety_notes,
+    requiresReview: true,
+  } satisfies PromptCard));
+
+  return [...modalityCards, ...reviewCards];
+}
+
+function ConsentRow({ label, scope, state }: { label: string; scope: string; state: "allowed" | "limited" | "blocked" }) {
   return (
-    <div className={styles.consentRow}>
-      <span className={`${styles.dot} ${styles[control.state]}`} aria-hidden="true" />
-      <div>
-        <strong>{control.label}</strong>
-        <p>{control.scope}</p>
-      </div>
+    <div className={`${styles.consentRow} ${state === "limited" ? styles.limited : state === "blocked" ? styles.blocked : ""}`}>
+      <span className={`${styles.dot} ${styles[state]}`} aria-hidden="true" />
+      <div><strong>{label}</strong><p>{scope}</p></div>
     </div>
   );
 }
@@ -99,101 +126,101 @@ function PromptCardView({ card }: { card: PromptCard }) {
   return (
     <article className={styles.promptCard}>
       <div className={styles.promptTopline}>
-        <span className={styles.modality}>{card.step}</span>
-        <span className={`${styles.pill} ${statusClass(card.status)}`}>{statusLabel(card.status)}</span>
+        <span className={styles.modality}>{card.modality}</span>
+        <span className={`${styles.pill} ${stateClass(card.responseState)}`}>{stateLabel(card.responseState)}</span>
       </div>
-      <h3>{card.title}</h3>
-      <p className={styles.prompt}>{card.prompt}</p>
-      <p className={styles.guidance}>{card.guidance}</p>
-      <div className={styles.mockBox}>
-        <span>Mocked response state</span>
-        <strong>{card.privacy === "excluded" ? "Excluded from package" : `${card.privacy} scope`}</strong>
-      </div>
-      <p className={styles.quality}>{card.quality}</p>
+      <h3>{titleFromId(card.prompt_id)}</h3>
+      <p className={styles.prompt}>{card.prompt_text}</p>
+      <p className={styles.guidance}>{card.guidance ?? card.elicitation_goal}</p>
+      <div className={styles.mockBox}><span>Fixture response state</span><strong>{stateLabel(card.rawState)}</strong></div>
+      {card.requiresReview && <p className={styles.quality}>Requires review before training/provider/model eligibility.</p>}
+      {card.safety_notes && <p className={styles.quality}>{card.safety_notes}</p>}
     </article>
   );
 }
 
 export default function CuratePage() {
-  const [lane, setLane] = useState<Lane>("self");
+  const [laneKey, setLaneKey] = useState<LaneKey>(livingSubjectLane.lane);
   const [activeStep, setActiveStep] = useState<StepKey>("consent");
-  const prompts = lane === "self" ? selfPrompts : familyPrompts;
-  const visiblePrompts = useMemo(() => prompts.filter((card) => card.step === activeStep), [activeStep, prompts]);
+  const lane = lanes.find((candidate) => candidate.lane === laneKey) ?? livingSubjectLane;
+  const cards = useMemo(protocolCards, []);
+  const visiblePrompts = cards.filter((card) => card.modality === activeStep);
   const counts = useMemo(() => ({
-    captured: prompts.filter((p) => ["captured", "submitted", "approved_with_limits"].includes(p.status)).length,
-    blocked: prompts.filter((p) => ["quarantined", "revoked"].includes(p.status)).length,
-    draft: prompts.filter((p) => p.status === "draft").length,
-  }), [prompts]);
+    answered: cards.filter((card) => card.responseState === "answered").length,
+    privateOnly: cards.filter((card) => card.responseState === "private_only").length,
+    needsReview: cards.filter((card) => card.responseState === "needs_review").length,
+    excluded: cards.filter((card) => card.responseState === "excluded_from_training").length,
+  }), [cards]);
+  const consentRows = governance.consent_matrix.map((row) => ({
+    label: `${row.modality} · ${row.use_case.replaceAll("_", " ")}`,
+    scope: `${row.allowed === "yes" ? "Allowed" : row.allowed === "limited" ? "Limited" : "Blocked"}: ${row.revocation_behavior}`,
+    state: row.allowed === "yes" ? "allowed" as const : row.allowed === "limited" ? "limited" as const : "blocked" as const,
+  }));
 
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Guided curation prototype</p>
-          <h1>Build a memorial package before upload/processing</h1>
-          <p className={styles.subtitle}>Sanctra now starts with consent, prompts, relationship context, and mocked modality state. Bulk upload and sanitation stay out of this first slice.</p>
+          <h1>Patrick-as-living-subject capture starts with prompt cards</h1>
+          <p className={styles.subtitle}>The /curate stub now renders its stages and cards from Sanctra fixture JSON. It remains mocked/local only until the privacy gate, manifest, and reviewer decisions approve real submission.</p>
         </div>
         <nav className={styles.nav}><Link href="/">Session</Link><Link href="/dataset">Dataset packet</Link><Link href="/upload">Bulk upload</Link></nav>
       </header>
 
       <section className={styles.laneGrid} aria-label="Choose curation lane">
-        {(["self", "family"] as Lane[]).map((option) => (
-          <button key={option} type="button" className={`${styles.laneCard} ${lane === option ? styles.selected : ""}`} onClick={() => { setLane(option); setActiveStep("consent"); }} aria-pressed={lane === option}>
-            <span>{option === "self" ? "Lane A" : "Lane B"}</span>
-            <strong>{laneCopy[option].title}</strong>
-            <p>{laneCopy[option].description}</p>
+        {lanes.map((option) => (
+          <button key={option.lane} type="button" className={`${styles.laneCard} ${laneKey === option.lane ? styles.selected : ""}`} onClick={() => { setLaneKey(option.lane); setActiveStep("consent"); }} aria-pressed={laneKey === option.lane}>
+            <span>{option.lane === "living_subject_guided" ? "Lane A · pilot first" : "Lane B · later"}</span>
+            <strong>{option.label}</strong>
+            <p>{laneDescriptions[option.lane].description}</p>
           </button>
         ))}
       </section>
 
       <section className={styles.workspace}>
         <aside className={styles.sidebar} aria-label="Curation progress">
-          <p className={styles.kicker}>Progress</p>
-          {steps.map((step) => (
-            <button key={step.key} type="button" className={`${styles.stepButton} ${activeStep === step.key ? styles.active : ""}`} onClick={() => setActiveStep(step.key)}>
-              <span>{step.label}</span>
-              <small>{step.helper}</small>
+          <p className={styles.kicker}>Fixture progress</p>
+          {lane.progress_steps.map((key) => (
+            <button key={key} type="button" className={`${styles.stepButton} ${activeStep === key ? styles.active : ""}`} onClick={() => setActiveStep(key)}>
+              <span>{stepCopy[key].label}</span><small>{stepCopy[key].helper}</small>
             </button>
           ))}
           <div className={styles.summaryBox}>
             <strong>Mock package status</strong>
-            <p>{counts.captured} captured/submitted · {counts.draft} draft · {counts.blocked} blocked</p>
-            <p className={styles.guardrail}>{laneCopy[lane].warning}</p>
+            <p>{counts.answered} answered · {counts.privateOnly} private-only · {counts.needsReview} needs review · {counts.excluded} excluded</p>
+            <p className={styles.guardrail}>{laneDescriptions[laneKey].warning}</p>
           </div>
         </aside>
 
         <section className={styles.panel}>
-          {activeStep === "consent" && (
-            <>
-              <p className={styles.kicker}>Consent matrix</p>
-              <h2>{laneCopy[lane].title}</h2>
-              <p className={styles.subtitle}>{laneCopy[lane].authority}</p>
-              <div className={styles.consentGrid}>{baseConsent.map((control) => <Toggle key={control.label} control={control} />)}</div>
-              <div className={styles.schemaNote}><strong>Governance seam</strong> Consent is artifact-level, modality-level, use-case-level, and revocable. Revocation must cascade through original, derivative, model-prep record, generated artifact, and future-training eligibility.</div>
-            </>
-          )}
+          {activeStep === "consent" && (<>
+            <p className={styles.kicker}>Consent and boundary gate</p>
+            <h2>{lane.label}</h2>
+            <p className={styles.subtitle}>{laneDescriptions[laneKey].authority}</p>
+            <div className={styles.consentGrid}>{consentRows.map((control) => <ConsentRow key={control.label} {...control} />)}</div>
+            <div className={styles.schemaNote}><strong>Required before pilot capture</strong><ul>{requiredRecords.map((record) => <li key={record}>{record}</li>)}</ul></div>
+            <div className={styles.schemaNote}><strong>Stop conditions shown before upload/training</strong><ul>{stopConditions.map((condition) => <li key={condition}>{condition}</li>)}</ul></div>
+          </>)}
 
-          {visiblePrompts.length > 0 && (
-            <>
-              <p className={styles.kicker}>{activeStep} prompt cards</p>
-              <h2>Guided prompts, not a generic text box</h2>
-              <div className={styles.promptGrid}>{visiblePrompts.map((card) => <PromptCardView key={card.id} card={card} />)}</div>
-            </>
-          )}
+          {visiblePrompts.length > 0 && (<>
+            <p className={styles.kicker}>{activeStep} prompt cards</p>
+            <h2>Guided prompts from protocol fixtures</h2>
+            <div className={styles.promptGrid}>{visiblePrompts.map((card) => <PromptCardView key={card.prompt_id} card={card} />)}</div>
+          </>)}
 
-          {activeStep === "review" && (
-            <>
-              <p className={styles.kicker}>Review and package summary</p>
-              <h2>Human review remains the release gate</h2>
-              <div className={styles.reviewGrid}>
-                <div><strong>Reusable now</strong><p>Text memories and relationship guidance that passed consent and privacy review.</p></div>
-                <div><strong>Approved with limits</strong><p>Audio/video/image references can be evaluation-only or private-family only until explicit likeness consent and quality thresholds are met.</p></div>
-                <div><strong>Blocked gaps</strong><p>Real storage URIs, reviewer identity, family authority/conflict decisions, derivative job receipts, and provider-specific thresholds.</p></div>
-                <div><strong>Next slice boundary</strong><p>Bulk uploader comes next; sanitation/processor follows after upload metadata and authority capture are proven.</p></div>
-              </div>
-              <div className={styles.schemaNote}><strong>Non-impersonation lock</strong> Prompt fixtures must train the product to say it is a memorial echo, never claim current awareness, never invent memories, and never speak as literal presence.</div>
-            </>
-          )}
+          {activeStep === "review" && (<>
+            <p className={styles.kicker}>Review and readiness summary</p>
+            <h2>Human review remains the release gate</h2>
+            <div className={styles.reviewGrid}>
+              <div><strong>Accepted placeholders</strong><p>Answered text prompt cards may be review candidates; all media remain placeholder/ref-only in this slice.</p></div>
+              <div><strong>Quarantined or missing</strong><p>Audio, image, video, likeness, direct-address, low-quality, disputed, or third-party material stays needs-review/quarantined.</p></div>
+              <div><strong>Required records</strong><p>{requiredRecords.join(" · ")}.</p></div>
+              <div><strong>Modality gaps</strong><p>{governance.quality_gates.map((gate) => `${gate.modality}: ${gate.minimum}`).join(" ")}</p></div>
+            </div>
+            <div className={styles.schemaNote}><strong>Pilot packet handoff</strong> Patrick can submit the first real packet only after storage policy approval by preparing a manifest with external/redacted refs, subject-self authority, package consent, private-review audience, revocation acknowledgement, provenance, hashes/placeholders, and high-presence review queue coverage.</div>
+            <div className={styles.schemaNote}><strong>Non-impersonation lock</strong> The protocol fixtures require Sanctra to disclose a memorial echo, never claim current awareness, never invent memories, and never speak as literal presence.</div>
+          </>)}
         </section>
       </section>
     </main>
