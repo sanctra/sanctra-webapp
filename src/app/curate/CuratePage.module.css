@@ -73,3 +73,56 @@
   .header, .laneGrid, .workspace, .promptGrid, .reviewGrid { grid-template-columns: 1fr; display: grid; }
   .sidebar { position: static; }
 }
+
+.captureBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--sanctra-muted);
+  font-weight: 800;
+}
+.captureBox textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--sanctra-line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fffdf8;
+  color: var(--sanctra-ink);
+  font: inherit;
+  font-weight: 500;
+}
+.captureButton {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: var(--sanctra-primary);
+  color: white;
+  font-weight: 850;
+  cursor: pointer;
+}
+.captureButton:disabled { opacity: .55; cursor: not-allowed; }
+.saved, .error {
+  margin: 10px 0 0;
+  border-radius: 14px;
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+.saved { color: var(--sanctra-safe); background: #edf7f1; border: 1px solid #b8d9c5; }
+.error { color: var(--sanctra-danger); background: #fff0ef; border: 1px solid #e6b3b0; }
+.saved code { word-break: break-word; color: var(--sanctra-ink); font-weight: 750; }
+.fileBox {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--sanctra-muted);
+  font-weight: 800;
+}
+.fileBox input {
+  border: 1px solid var(--sanctra-line);
+  border-radius: 14px;
+  padding: 10px;
+  background: #fffdf8;
+  color: var(--sanctra-ink);
+}
