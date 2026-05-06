@@ -212,3 +212,15 @@
   line-height: 1.6;
   padding-left: 22px;
 }
+
+.error {
+  border-color: #e6b3b0;
+  background: #fff0ef;
+  color: #8d2f2a;
+}
+
+.notice code {
+  word-break: break-word;
+  color: #4c3325;
+  font-weight: 750;
+}

@@ -47,7 +47,13 @@ const laneCopy: Record<Lane, { label: string; subtitle: string; prepare: string[
   },
 };
 
-const storageKey = "sanctra-demo-dataset-submissions";
+type SubmissionResult = {
+  id: string;
+  createdAt: string;
+  reviewStatus: string;
+  reviewableLocation: string;
+  storageRef: { provider: string; uri: string; localMirrorPath: string; objectKey: string };
+};
 
 const packetSteps: PacketStep[] = [
   {
@@ -56,11 +62,11 @@ const packetSteps: PacketStep[] = [
   },
   {
     title: "Gather the controlled-storage references",
-    detail: "Keep media outside this demo page. The later real-data step needs reviewed storage locations or upload targets rather than direct provider calls from the browser.",
+    detail: "Submit the packet to the backend API. It persists a reviewable JSON artifact and returns the controlled storage reference used by reviewers.",
   },
   {
     title: "Hand off for bounded preflight review",
-    detail: "Once the packet is complete, the next step is a no-provider preflight/import pass so Sanctra can validate the packet before any live memorial artifact work resumes.",
+    detail: "Once the packet is stored, the returned reviewable location can feed the bounded preflight/import pass before any live memorial artifact work resumes.",
   },
 ];
 
@@ -95,7 +101,9 @@ function TextField({ id, label, value, placeholder, rows, onChange }: { id: Fiel
 export default function DatasetSubmissionPage() {
   const [lane, setLane] = useState<Lane>("self");
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, authority: laneCopy.self.authority });
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<SubmissionResult | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const copy = laneCopy[lane];
   const complete = useMemo(() => requiredComplete(draft), [draft]);
 
@@ -110,21 +118,27 @@ export default function DatasetSubmissionPage() {
     setSubmitted(null);
   };
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!complete) return;
+    if (!complete || submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    setSubmitted(null);
 
-    const submission = {
-      id: `demo-${Date.now()}`,
-      lane,
-      createdAt: new Date().toISOString(),
-      fields: draft,
-      persistence: "localStorage demo boundary only; no production provider call and no external storage upload performed",
-    };
-
-    const existing = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as unknown[];
-    window.localStorage.setItem(storageKey, JSON.stringify([submission, ...existing].slice(0, 10), null, 2));
-    setSubmitted(submission.id);
+    try {
+      const response = await fetch("/api/dataset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lane, fields: draft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || data.error || "Dataset submission failed");
+      setSubmitted(data as SubmissionResult);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Dataset submission failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -159,7 +173,7 @@ export default function DatasetSubmissionPage() {
           <p className={styles.subtitle}>All fields are required so the future backend contract can separate identity, authority, materials, context, contact, and storage review.</p>
           <div className={styles.notice}>
             <strong>Submission boundary</strong>
-            This page intentionally stops before any production upload or provider call. Saving here creates a local browser draft only, so Patrick can prepare a complete packet without needing secrets or live storage access during intake.
+            Saving now calls the Sanctra webapp backend and writes a reviewable artifact to configured controlled storage. Provider generation remains disabled; this is intake persistence only.
           </div>
 
           <div className={styles.stepList} aria-label="Submission packet steps">
@@ -189,17 +203,23 @@ export default function DatasetSubmissionPage() {
           </label>
           <label className={styles.check}>
             <input type="checkbox" checked={draft.storage} onChange={(event) => update("storage", event.target.checked)} />
-            <span>I understand upload/storage is mocked locally here; real controlled storage review is still required.</span>
+            <span>I understand this submission writes to controlled review storage and still requires human review before any model/provider use.</span>
           </label>
 
           <div className={styles.controls}>
-            <button className={styles.button} type="submit" disabled={!complete}>Save local demo submission</button>
-            <span className={`${styles.chip} ${complete ? styles.ready : styles.paused}`}>{complete ? "Ready to save" : "Required fields pending"}</span>
+            <button className={styles.button} type="submit" disabled={!complete || submitting}>{submitting ? "Saving to storage…" : "Submit dataset packet"}</button>
+            <span className={`${styles.chip} ${complete ? styles.ready : styles.paused}`}>{complete ? "Ready for backend storage" : "Required fields pending"}</span>
           </div>
           {submitted && (
             <p className={styles.notice} role="status">
-              <strong>Local demo submission saved</strong>
-              Submission {submitted} was saved to this browser&apos;s localStorage only. No external upload or production provider call was made.
+              <strong>Dataset packet persisted for review</strong>
+              Submission <code>{submitted.id}</code> saved at <code>{submitted.reviewableLocation}</code> with status <code>{submitted.reviewStatus}</code>.
+            </p>
+          )}
+          {submitError && (
+            <p className={`${styles.notice} ${styles.error}`} role="alert">
+              <strong>Submission failed</strong>
+              {submitError}
             </p>
           )}
         </form>
@@ -209,7 +229,7 @@ export default function DatasetSubmissionPage() {
           <p className={styles.subtitle}>Use this checklist before submitting himself or a family-authorized packet through the intended flow.</p>
           <div className={styles.notice}>
             <strong>What remains after this page</strong>
-            After Patrick saves a complete packet, the remaining real-data step is controlled-storage review plus the bounded local preflight/import sequence. No realtime, live-avatar, or uncontrolled external upload is part of this intake lane.
+            After Patrick submits a complete packet, reviewers can use the returned storage reference for controlled-storage review plus the bounded local preflight/import sequence. No realtime, live-avatar, or uncontrolled provider call is part of this intake lane.
           </div>
           <div className={styles.chipRow}>
             <span className={`${styles.chip} ${styles.ready}`}>Identity</span>
@@ -217,14 +237,14 @@ export default function DatasetSubmissionPage() {
             <span className={`${styles.chip} ${styles.ready}`}>Source materials</span>
             <span className={`${styles.chip} ${styles.ready}`}>Context</span>
             <span className={`${styles.chip} ${styles.ready}`}>Contact / preferences</span>
-            <span className={`${styles.chip} ${styles.paused}`}>Controlled storage placeholder</span>
+            <span className={`${styles.chip} ${styles.ready}`}>Controlled storage reference</span>
           </div>
           <ol className={styles.prepareList}>
             {copy.prepare.map((item) => <li key={item}>{item}</li>)}
           </ol>
           <div className={styles.notice}>
-            <strong>Mock persistence boundary</strong>
-            The current implementation stores only structured demo data in localStorage under <code>{storageKey}</code>. File upload controls are intentionally represented as source-material inventory fields until controlled storage is wired.
+            <strong>Persistence boundary</strong>
+            The current implementation persists structured intake JSON through <code>/api/dataset</code>. Source media remain represented as inventory/review references until controlled file upload credentials are configured.
           </div>
         </aside>
       </section>

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:real-storage": "node --experimental-strip-types scripts/test-real-storage-contract.mjs",
+    "test:curate-storage": "node --experimental-strip-types scripts/test-real-storage-contract.mjs"
   },
   "dependencies": {
     "next": "14.2.5",
