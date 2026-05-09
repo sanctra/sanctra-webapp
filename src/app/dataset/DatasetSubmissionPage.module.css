@@ -212,3 +212,82 @@
   line-height: 1.6;
   padding-left: 22px;
 }
+
+.slotGrid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.slotCard {
+  border: 1px solid #eadfce;
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255,255,255,.62);
+}
+
+.slotHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.slotHeader h3 {
+  margin: 0;
+  color: #2d2520;
+}
+
+.twoCol {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .twoCol {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dfd2c3;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fffdf8;
+  color: #2d2520;
+  font: inherit;
+}
+
+.uri {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #2d2520;
+  color: #fffaf3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.slotMeta {
+  margin: 8px 0 0;
+  color: #74685f;
+  font-size: 13px;
+}
+
+.preview {
+  max-height: 380px;
+  overflow: auto;
+  border: 1px solid #dfd2c3;
+  border-radius: 16px;
+  padding: 14px;
+  background: #2d2520;
+  color: #fffaf3;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
