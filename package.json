@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:corpus-intake": "node scripts/validate-corpus-intake-contract.mjs"
   },
   "dependencies": {
     "next": "14.2.5",
