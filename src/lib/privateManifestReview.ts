@@ -1,3 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { cookies, headers } from "next/headers";
+
 export type ManifestLane = "live_subject" | "posthumous_archive";
 export type ReviewState =
   | "corpus_staged"
@@ -27,6 +31,10 @@ export const HARD_LOCKS = [
   "No raw corpus exposure by default",
   "No browser-direct corpus download",
 ] as const;
+
+const PILOT_CORPUS_PREFIX = "gs://sanctra-corpus-intake/pilot-corpus/" as const;
+const ADMIN_COOKIE_NAME = "sanctra_manifest_review_key";
+const ADMIN_HEADER_NAME = "x-sanctra-manifest-review-key";
 
 export type ManifestItem = {
   id: string;
@@ -58,6 +66,19 @@ export type IntakeManifest = {
   items: ManifestItem[];
 };
 
+export type ManifestQueueSource = "gcs_metadata_export" | "fixture_only";
+
+export type PrivateManifestQueue = {
+  source: ManifestQueueSource;
+  sourceLabel: string;
+  manifests: IntakeManifest[];
+};
+
+export type ManifestReviewAccess = {
+  allowed: boolean;
+  reason: "allowed" | "admin_secret_missing" | "admin_secret_too_short" | "credential_missing" | "credential_mismatch";
+};
+
 const defaultBlockedOperations = [
   "provider_call",
   "training_or_finetuning",
@@ -66,7 +87,7 @@ const defaultBlockedOperations = [
   "derived_dataset_release",
 ];
 
-export const pilotManifestQueue: IntakeManifest[] = [
+const pilotFixtureManifestQueue: IntakeManifest[] = [
   {
     intakeId: "pilot-live-patrick-001",
     lane: "live_subject",
@@ -196,6 +217,98 @@ export const pilotManifestQueue: IntakeManifest[] = [
     ],
   },
 ];
+
+function safeCompare(candidate: string, expected: string): boolean {
+  const left = Buffer.from(candidate);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+export function getPrivateManifestReviewAccess(): ManifestReviewAccess {
+  const adminSecret = process.env.SANCTRA_PRIVATE_MANIFEST_REVIEW_ADMIN_SECRET;
+  if (!adminSecret) return { allowed: false, reason: "admin_secret_missing" };
+  if (adminSecret.length < 16) return { allowed: false, reason: "admin_secret_too_short" };
+
+  const suppliedSecret = headers().get(ADMIN_HEADER_NAME) ?? cookies().get(ADMIN_COOKIE_NAME)?.value;
+  if (!suppliedSecret) return { allowed: false, reason: "credential_missing" };
+  if (!safeCompare(suppliedSecret, adminSecret)) return { allowed: false, reason: "credential_mismatch" };
+
+  return { allowed: true, reason: "allowed" };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertStringArray(value: unknown, path: string): asserts value is string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new Error(`invalid private manifest queue: ${path} must be a string array`);
+  }
+}
+
+function assertManifestItem(value: unknown, path: string): asserts value is ManifestItem {
+  if (!isRecord(value)) throw new Error(`invalid private manifest queue: ${path} must be an object`);
+  for (const key of ["id", "modality", "label", "reviewState", "provenanceNote", "consentNote", "authorityStatus", "identityConfidence", "likenessRisk", "reviewerRecommendation"] as const) {
+    if (typeof value[key] !== "string") throw new Error(`invalid private manifest queue: ${path}.${key} must be a string`);
+  }
+  const modality = value.modality as string;
+  const reviewState = value.reviewState as string;
+  if (!["text", "audio", "image", "video"].includes(modality)) throw new Error(`invalid private manifest queue: ${path}.modality is not supported`);
+  if (!REVIEW_STATES.includes(reviewState as ReviewState)) throw new Error(`invalid private manifest queue: ${path}.reviewState is not supported`);
+  assertStringArray(value.privacyFlags, `${path}.privacyFlags`);
+  assertStringArray(value.blockedOperations, `${path}.blockedOperations`);
+}
+
+function assertIntakeManifest(value: unknown, path: string): asserts value is IntakeManifest {
+  if (!isRecord(value)) throw new Error(`invalid private manifest queue: ${path} must be an object`);
+  for (const key of ["intakeId", "lane", "subjectDisplayName", "submitterDisplayName", "submittedAt", "manifestUri", "storageRoot", "manifestHash", "authorityStatus"] as const) {
+    if (typeof value[key] !== "string") throw new Error(`invalid private manifest queue: ${path}.${key} must be a string`);
+  }
+  const lane = value.lane as string;
+  const manifestUri = value.manifestUri as string;
+  const storageRoot = value.storageRoot as string;
+  if (!["live_subject", "posthumous_archive"].includes(lane)) throw new Error(`invalid private manifest queue: ${path}.lane is not supported`);
+  if (!manifestUri.startsWith(PILOT_CORPUS_PREFIX) || !storageRoot.startsWith(PILOT_CORPUS_PREFIX)) {
+    throw new Error(`invalid private manifest queue: ${path} must stay under ${PILOT_CORPUS_PREFIX}`);
+  }
+  assertStringArray(value.privacyFlags, `${path}.privacyFlags`);
+  assertStringArray(value.blockedOperations, `${path}.blockedOperations`);
+  if (!Array.isArray(value.items) || value.items.length === 0) throw new Error(`invalid private manifest queue: ${path}.items must be a non-empty array`);
+  value.items.forEach((item, index) => assertManifestItem(item, `${path}.items[${index}]`));
+}
+
+function parseManifestQueue(rawJson: string, sourceLabel: string): PrivateManifestQueue {
+  const parsed = JSON.parse(rawJson) as unknown;
+  const manifests = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed) && Array.isArray(parsed.manifests)
+      ? parsed.manifests
+      : null;
+  if (!manifests) throw new Error(`invalid private manifest queue: ${sourceLabel} must be an array or { manifests: [...] }`);
+  manifests.forEach((manifest, index) => assertIntakeManifest(manifest, `manifests[${index}]`));
+  return { source: "gcs_metadata_export", sourceLabel, manifests };
+}
+
+export function loadPrivateManifestQueue(): PrivateManifestQueue {
+  const inlineQueue = process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON;
+  if (inlineQueue) return parseManifestQueue(inlineQueue, "SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON server-side GCS metadata export");
+
+  const queuePath = process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH;
+  if (queuePath) {
+    if (!existsSync(queuePath)) throw new Error(`private manifest queue path does not exist: ${queuePath}`);
+    return parseManifestQueue(readFileSync(queuePath, "utf8"), "SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH server-side GCS metadata export");
+  }
+
+  if (process.env.SANCTRA_PRIVATE_MANIFEST_REVIEW_FIXTURE_MODE === "enabled") {
+    return {
+      source: "fixture_only",
+      sourceLabel: "explicit fixture-only mode; not live GCS manifest coverage",
+      manifests: pilotFixtureManifestQueue,
+    };
+  }
+
+  throw new Error("private manifest queue is not configured; set SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON or SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH, or explicitly enable SANCTRA_PRIVATE_MANIFEST_REVIEW_FIXTURE_MODE=enabled for non-production fixture review");
+}
 
 export function countByModality(manifest: IntakeManifest): Record<Modality, number> {
   return manifest.items.reduce<Record<Modality, number>>(

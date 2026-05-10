@@ -1,16 +1,20 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import styles from "./ManifestReviewPage.module.css";
 import {
   HARD_LOCKS,
   REVIEW_STATES,
   countByModality,
   countByReviewState,
+  getPrivateManifestReviewAccess,
+  loadPrivateManifestQueue,
   manifestStorageSummary,
-  pilotManifestQueue,
   unresolvedFlags,
   type IntakeManifest,
   type ReviewState,
 } from "@/lib/privateManifestReview";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Private manifest review queue · Sanctra",
@@ -67,7 +71,7 @@ function DetailCard({ manifest }: { manifest: IntakeManifest }) {
         <div>
           <p className={styles.kicker}>Metadata-only detail</p>
           <h3 id={`${manifest.intakeId}-detail`}>{manifest.intakeId} review detail</h3>
-          <p className={styles.subtitle}>Raw object names and media download links are intentionally withheld in this pilot view.</p>
+          <p className={styles.subtitle}>Raw object names and media download links are intentionally withheld in this private view.</p>
         </div>
         <span className={styles.chip}>{manifest.items.length} review items</span>
       </div>
@@ -106,13 +110,19 @@ function DetailCard({ manifest }: { manifest: IntakeManifest }) {
 }
 
 export default function ManifestReviewPage() {
+  const access = getPrivateManifestReviewAccess();
+  if (!access.allowed) notFound();
+
+  const queue = loadPrivateManifestQueue();
+  const isFixtureOnly = queue.source === "fixture_only";
+
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Private admin · pilot corpus</p>
           <h1>Manifest reviewer queue</h1>
-          <p className={styles.subtitle}>Metadata-only review of staged manifests under gs://sanctra-corpus-intake/pilot-corpus. This view summarizes intake state, authority/privacy risk, and reviewer recommendations without rendering or linking raw corpus media.</p>
+          <p className={styles.subtitle}>Server-side, authenticated review of staged manifest metadata under gs://sanctra-corpus-intake/pilot-corpus. This view summarizes intake state, authority/privacy risk, and reviewer recommendations without rendering or linking raw corpus media.</p>
         </div>
         <nav className={styles.nav} aria-label="Sanctra admin navigation">
           <Link href="/dataset">Dataset intake</Link>
@@ -121,11 +131,19 @@ export default function ManifestReviewPage() {
         </nav>
       </header>
 
+      <section className={styles.banner} aria-labelledby="source-title">
+        <div>
+          <p className={styles.kicker}>{isFixtureOnly ? "Fixture-only gate" : "Server-side manifest source"}</p>
+          <h2 id="source-title">{isFixtureOnly ? "Fixture-only review mode is explicitly enabled." : "Queue data is loaded from a configured server-side GCS metadata export."}</h2>
+          <p className={styles.subtitle}>{queue.sourceLabel}. {isFixtureOnly ? "This deployment must not be represented as live GCS manifest-read coverage." : "The page does not import fixture data on the production review path."}</p>
+        </div>
+      </section>
+
       <section className={styles.banner} aria-labelledby="lock-title">
         <div>
           <p className={styles.kicker}>Pilot hard locks</p>
           <h2 id="lock-title">Review metadata only; raw corpus exposure stays blocked.</h2>
-          <p className={styles.subtitle}>The implementation uses server-side manifest metadata fixtures that mirror the CTO handoff fields. It does not fetch GCS media from the browser, expose signed URLs, call providers, or start training/derived-dataset transitions.</p>
+          <p className={styles.subtitle}>The implementation reads server-side manifest metadata only. It does not fetch GCS media from the browser, expose signed URLs, call providers, or start training/derived-dataset transitions.</p>
         </div>
         <div className={styles.lockGrid}>
           {HARD_LOCKS.map((lock) => <div key={lock} className={styles.lockCard}>{lock}</div>)}
@@ -133,11 +151,11 @@ export default function ManifestReviewPage() {
       </section>
 
       <section className={styles.queue} aria-label="Private reviewer queue list">
-        {pilotManifestQueue.map((manifest) => <QueueCard key={manifest.intakeId} manifest={manifest} />)}
+        {queue.manifests.map((manifest) => <QueueCard key={manifest.intakeId} manifest={manifest} />)}
       </section>
 
       <section className={styles.details} aria-label="Private reviewer detail views">
-        {pilotManifestQueue.map((manifest) => <DetailCard key={manifest.intakeId} manifest={manifest} />)}
+        {queue.manifests.map((manifest) => <DetailCard key={manifest.intakeId} manifest={manifest} />)}
       </section>
     </main>
   );
