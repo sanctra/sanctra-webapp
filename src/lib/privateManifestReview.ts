@@ -344,6 +344,33 @@ export function manifestStorageSummary(manifest: IntakeManifest): string {
 
 export type PackageDashboardModality = Modality | "missing";
 
+export type PackagePreviewSection = {
+  title: string;
+  status: "included" | "limited" | "blocked";
+  summary: string;
+  evidence: string[];
+  blockedUntil: string[];
+};
+
+export type PackagePreviewArtifact = {
+  label: string;
+  status: "available_in_preview" | "withheld" | "blocked";
+  reason: string;
+};
+
+export type PackageExportPreview = {
+  intakeId: string;
+  subjectLabel: string;
+  lane: ManifestLane;
+  readiness: "preview_only" | "review_ready" | "blocked";
+  consultantHandoff: PackagePreviewSection;
+  familyReviewSummary: PackagePreviewSection;
+  providerHandoffReadiness: PackagePreviewSection;
+  blockedArtifacts: PackagePreviewArtifact[];
+  disabledCtas: string[];
+  reviewGate: string;
+};
+
 export type PackageDashboardSummary = {
   intakeId: string;
   lane: ManifestLane;
@@ -365,6 +392,12 @@ export type PackageDashboardData = {
   source: ManifestQueueSource;
   sourceLabel: string;
   summaries: PackageDashboardSummary[];
+};
+
+export type PackageExportPreviewData = {
+  source: ManifestQueueSource;
+  sourceLabel: string;
+  previews: PackageExportPreview[];
 };
 
 function redactedManifestRef(manifest: IntakeManifest): string {
@@ -425,6 +458,90 @@ function summarizePackage(manifest: IntakeManifest): PackageDashboardSummary {
   };
 }
 
+function previewSection(
+  title: string,
+  status: PackagePreviewSection["status"],
+  summary: string,
+  evidence: string[],
+  blockedUntil: string[],
+): PackagePreviewSection {
+  return { title, status, summary, evidence, blockedUntil };
+}
+
+function previewReadiness(manifest: IntakeManifest, reviewCounts: Record<ReviewState, number>): PackageExportPreview["readiness"] {
+  if (manifest.authorityStatus === "disputed" || reviewCounts.quarantined > 0 || reviewCounts.rejected > 0) return "blocked";
+  if (reviewCounts.needs_review > 0 || reviewCounts.corpus_staged > 0 || manifest.authorityStatus === "needs_authority_review") return "preview_only";
+  return "review_ready";
+}
+
+function summarizePreview(manifest: IntakeManifest): PackageExportPreview {
+  const modalityCounts = countByModality(manifest);
+  const reviewCounts = countByReviewState(manifest);
+  const accepted = manifest.items.filter((item) => item.reviewState === "approved" || item.reviewState === "approved_with_limits");
+  const limited = manifest.items.filter((item) => item.reviewState === "approved_with_limits");
+  const blocked = manifest.items.filter((item) => item.reviewState === "quarantined" || item.reviewState === "rejected");
+  const pending = manifest.items.filter((item) => item.reviewState === "corpus_staged" || item.reviewState === "needs_review");
+  const readiness = previewReadiness(manifest, reviewCounts);
+  const lockedOperations = Array.from(new Set([...defaultBlockedOperations, ...manifest.blockedOperations, ...manifest.items.flatMap((item) => item.blockedOperations)])).sort();
+
+  return {
+    intakeId: manifest.intakeId,
+    subjectLabel: manifest.subjectDisplayName,
+    lane: manifest.lane,
+    readiness,
+    consultantHandoff: previewSection(
+      "Consultant handoff preview",
+      accepted.length > 0 ? "limited" : "blocked",
+      `${accepted.length} reviewed item(s) could appear as metadata-only consultant context; raw objects and generated exports remain unavailable.`,
+      [
+        `${modalityCounts.text} text · ${modalityCounts.audio} audio · ${modalityCounts.image} image · ${modalityCounts.video} video metadata entries`,
+        `${limited.length} approved-with-limits item(s) require package notes`,
+        redactedManifestRef(manifest),
+      ],
+      ["Axiom/privacy review for real package generation", "Human reviewer approval for every included item"],
+    ),
+    familyReviewSummary: previewSection(
+      "Family/reviewer summary",
+      manifest.lane === "posthumous_archive" || unresolvedFlags(manifest).length > 0 ? "limited" : "included",
+      `${manifest.submitterDisplayName} and authority status are visible for review planning without exposing raw content.`,
+      [
+        `Authority: ${manifest.authorityStatus}`,
+        `${unresolvedFlags(manifest).length} unresolved privacy/likeness flag(s)`,
+        `${pending.length} pending item(s)`,
+      ],
+      ["Authority basis confirmed", "Third-party/privacy flags dispositioned"],
+    ),
+    providerHandoffReadiness: previewSection(
+      "Provider handoff readiness",
+      readiness === "review_ready" ? "limited" : "blocked",
+      "Provider payloads are intentionally not generated; this section only shows the gates that would be checked before a future handoff.",
+      [
+        `Readiness: ${readiness.replaceAll("_", " ")}`,
+        `Blocked operations: ${lockedOperations.join(", ")}`,
+        manifestStorageSummary(manifest),
+      ],
+      ["Explicit architecture/privacy approval", "Provider contract and destination review", "Signed URL/export path implementation review"],
+    ),
+    blockedArtifacts: [
+      { label: "ZIP/download package", status: "blocked", reason: "No export files, browser downloads, or signed URLs are created by this seam." },
+      { label: "Raw media/object links", status: "withheld", reason: "Only redacted manifest/storage summary refs are shown." },
+      { label: "Derived dataset release", status: "blocked", reason: "Dataset release remains locked behind reviewer, privacy, and architecture gates." },
+      { label: "Provider handoff payload", status: "blocked", reason: "No provider call or payload serialization exists in this preview." },
+      { label: "Training/fine-tuning input", status: "blocked", reason: "Training and fine-tuning are hard-locked non-goals." },
+      ...blocked.map((item) => ({ label: item.label, status: "blocked" as const, reason: `${item.reviewState.replaceAll("_", " ")}: ${item.reviewerRecommendation}` })),
+    ],
+    disabledCtas: [
+      "Generate export package",
+      "Download raw media",
+      "Create signed URL",
+      "Send provider handoff",
+      "Release derived dataset",
+      "Start training or fine-tuning",
+    ],
+    reviewGate: "Real package generation, downloads, signed URLs, provider payloads, reviewer approval transitions, and derived media links require Axiom/privacy review before implementation.",
+  };
+}
+
 export function loadPackageDashboardData(): PackageDashboardData {
   const hasConfiguredQueue = Boolean(process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON || process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH);
   const explicitFixtureMode = process.env.SANCTRA_PRIVATE_MANIFEST_REVIEW_FIXTURE_MODE === "enabled";
@@ -442,5 +559,26 @@ export function loadPackageDashboardData(): PackageDashboardData {
     source: queue.source,
     sourceLabel: queue.sourceLabel,
     summaries: queue.manifests.map(summarizePackage),
+  };
+}
+
+
+export function loadPackageExportPreviewData(): PackageExportPreviewData {
+  const hasConfiguredQueue = Boolean(process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON || process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH);
+  const explicitFixtureMode = process.env.SANCTRA_PRIVATE_MANIFEST_REVIEW_FIXTURE_MODE === "enabled";
+
+  if (!hasConfiguredQueue && !explicitFixtureMode) {
+    return {
+      source: "fixture_only",
+      sourceLabel: "fixture/local manifest metadata fallback; no live storage read, package generation, or provider call",
+      previews: pilotFixtureManifestQueue.map(summarizePreview),
+    };
+  }
+
+  const queue = loadPrivateManifestQueue();
+  return {
+    source: queue.source,
+    sourceLabel: queue.sourceLabel,
+    previews: queue.manifests.map(summarizePreview),
   };
 }

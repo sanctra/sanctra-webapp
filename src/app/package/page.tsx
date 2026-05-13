@@ -63,6 +63,7 @@ export default function PackageDashboardPage() {
           </p>
         </div>
         <nav className={styles.nav} aria-label="Package dashboard navigation">
+          <Link href="/package/export">Export preview</Link>
           <Link href="/dataset">Dataset intake</Link>
           <Link href="/curate">Curation</Link>
           <Link href="/admin/manifest-review">Manifest review</Link>
