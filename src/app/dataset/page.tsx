@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./DatasetSubmissionPage.module.css";
 
@@ -8,6 +8,16 @@ type Lane = "self" | "family";
 type FieldKey = "subjectName" | "submitterName" | "relationship" | "contact" | "authority" | "sourceMaterials" | "contextNotes" | "preferences";
 type Draft = Record<FieldKey, string> & { consent: boolean; storage: boolean };
 type PacketStep = { title: string; detail: string };
+type ReadinessItem = { label: string; complete: boolean; detail: string };
+type ModalityKey = "voice" | "video" | "photo" | "writing" | "documents";
+type Submission = {
+  id: string;
+  lane: Lane;
+  createdAt: string;
+  fields: Draft;
+  readiness: { completed: number; total: number; modalities: ModalityKey[]; warnings: string[] };
+  persistence: string;
+};
 
 const emptyDraft: Draft = {
   subjectName: "",
@@ -64,19 +74,39 @@ const packetSteps: PacketStep[] = [
   },
 ];
 
-function requiredComplete(draft: Draft) {
-  return Boolean(
-    draft.subjectName.trim() &&
-      draft.submitterName.trim() &&
-      draft.relationship.trim() &&
-      draft.contact.trim() &&
-      draft.authority.trim() &&
-      draft.sourceMaterials.trim() &&
-      draft.contextNotes.trim() &&
-      draft.preferences.trim() &&
-      draft.consent &&
-      draft.storage,
-  );
+function getReadinessItems(draft: Draft): ReadinessItem[] {
+  return [
+    { label: "Subject identity", complete: Boolean(draft.subjectName.trim()), detail: "Preferred/legal name and test-packet identifiers are present." },
+    { label: "Submitter authority", complete: Boolean(draft.submitterName.trim() && draft.relationship.trim() && draft.authority.trim() && draft.consent), detail: "Submitter, relationship, authority language, and consent checkbox are complete." },
+    { label: "Review contact", complete: Boolean(draft.contact.trim()), detail: "Follow-up reviewer or escalation contact is captured." },
+    { label: "Source inventory", complete: Boolean(draft.sourceMaterials.trim()), detail: "Packet names the media/docs available without browser upload." },
+    { label: "Context and boundaries", complete: Boolean(draft.contextNotes.trim() && draft.preferences.trim()), detail: "Notes, red lines, artifact modes, and approval preferences are explicit." },
+    { label: "Controlled storage boundary", complete: draft.storage, detail: "Submitter acknowledged that real storage review is still required." },
+  ];
+}
+
+function detectModalities(sourceMaterials: string): ModalityKey[] {
+  const text = sourceMaterials.toLowerCase();
+  return ([
+    ["voice", ["voice", "audio", "voicemail", "recording", "mp3", "wav"]],
+    ["video", ["video", "mp4", "mov", "clip"]],
+    ["photo", ["photo", "image", "picture", "portrait", "jpg", "png"]],
+    ["writing", ["writing", "journal", "letter", "email", "post", "text"]],
+    ["documents", ["document", "pdf", "record", "certificate", "archive", "link"]],
+  ] as const)
+    .filter(([, needles]) => needles.some((needle) => text.includes(needle)))
+    .map(([key]) => key);
+}
+
+function getPrivacyWarnings(draft: Draft): string[] {
+  const combined = `${draft.sourceMaterials} ${draft.contextNotes} ${draft.preferences}`.toLowerCase();
+  const warnings = [
+    ["third-party people named", ["friend", "neighbor", "coworker", "third party", "minor", "child"]],
+    ["medical or grief-sensitive detail", ["medical", "diagnosis", "therapy", "trauma", "grief", "death", "hospice"]],
+    ["high-presence artifact requested", ["voice clone", "video", "avatar", "live", "call", "speak as"]],
+  ] as const;
+
+  return warnings.filter(([, needles]) => needles.some((needle) => combined.includes(needle))).map(([label]) => label);
 }
 
 function TextField({ id, label, value, placeholder, rows, onChange }: { id: FieldKey; label: string; value: string; placeholder: string; rows?: number; onChange: (key: FieldKey, value: string) => void }) {
@@ -96,8 +126,21 @@ export default function DatasetSubmissionPage() {
   const [lane, setLane] = useState<Lane>("self");
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, authority: laneCopy.self.authority });
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [savedSubmissions, setSavedSubmissions] = useState<Submission[]>([]);
   const copy = laneCopy[lane];
-  const complete = useMemo(() => requiredComplete(draft), [draft]);
+  const readinessItems = useMemo(() => getReadinessItems(draft), [draft]);
+  const complete = useMemo(() => readinessItems.every((item) => item.complete), [readinessItems]);
+  const completedCount = readinessItems.filter((item) => item.complete).length;
+  const modalities = useMemo(() => detectModalities(draft.sourceMaterials), [draft.sourceMaterials]);
+  const privacyWarnings = useMemo(() => getPrivacyWarnings(draft), [draft]);
+
+  useEffect(() => {
+    try {
+      setSavedSubmissions(JSON.parse(window.localStorage.getItem(storageKey) || "[]") as Submission[]);
+    } catch {
+      setSavedSubmissions([]);
+    }
+  }, []);
 
   const update = (key: keyof Draft, value: string | boolean) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -114,16 +157,24 @@ export default function DatasetSubmissionPage() {
     event.preventDefault();
     if (!complete) return;
 
-    const submission = {
+    const submission: Submission = {
       id: `demo-${Date.now()}`,
       lane,
       createdAt: new Date().toISOString(),
       fields: draft,
+      readiness: {
+        completed: completedCount,
+        total: readinessItems.length,
+        modalities,
+        warnings: privacyWarnings,
+      },
       persistence: "localStorage demo boundary only; no production provider call and no external storage upload performed",
     };
 
-    const existing = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as unknown[];
-    window.localStorage.setItem(storageKey, JSON.stringify([submission, ...existing].slice(0, 10), null, 2));
+    const existing = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as Submission[];
+    const nextSubmissions = [submission, ...existing].slice(0, 10);
+    window.localStorage.setItem(storageKey, JSON.stringify(nextSubmissions, null, 2));
+    setSavedSubmissions(nextSubmissions);
     setSubmitted(submission.id);
   };
 
@@ -151,6 +202,47 @@ export default function DatasetSubmissionPage() {
           ))}
         </div>
         <p className={styles.subtitle}>{copy.subtitle}</p>
+      </section>
+
+
+      <section className={styles.dashboard} aria-labelledby="dashboard-title">
+        <div className={styles.card}>
+          <p className={styles.kicker}>Packet readiness</p>
+          <h2 id="dashboard-title">Dashboard before the real packet arrives</h2>
+          <p className={styles.subtitle}>This mirrors the reviewer handoff state without uploading media: completion, modality coverage, privacy flags, and local queue history stay visible as Patrick prepares the real packet.</p>
+          <div className={styles.meter} aria-label={`${completedCount} of ${readinessItems.length} readiness checks complete`}>
+            <span style={{ width: `${(completedCount / readinessItems.length) * 100}%` }} />
+          </div>
+          <div className={styles.readinessGrid}>
+            {readinessItems.map((item) => (
+              <div key={item.label} className={`${styles.readinessItem} ${item.complete ? styles.readinessComplete : ""}`}>
+                <span aria-hidden="true">{item.complete ? "✓" : "•"}</span>
+                <div>
+                  <strong>{item.label}</strong>
+                  <p>{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.card}>
+          <p className={styles.kicker}>Modality + privacy</p>
+          <h2>Review posture</h2>
+          <div className={styles.chipRow} aria-label="Detected source material modalities">
+            {(["voice", "video", "photo", "writing", "documents"] as ModalityKey[]).map((mode) => (
+              <span key={mode} className={`${styles.chip} ${modalities.includes(mode) ? styles.ready : styles.paused}`}>{modalities.includes(mode) ? "Included" : "Missing"}: {mode}</span>
+            ))}
+          </div>
+          <div className={privacyWarnings.length ? styles.warningBox : styles.notice}>
+            <strong>{privacyWarnings.length ? "Privacy review flags detected" : "No keyword privacy flags yet"}</strong>
+            {privacyWarnings.length ? privacyWarnings.join(", ") : "Add explicit boundaries for third parties, medical/grief-sensitive material, and high-presence voice/video requests before real import."}
+          </div>
+          <div className={styles.notice}>
+            <strong>Reviewer handoff requirement</strong>
+            Any saved packet remains a local draft until controlled-storage references are reviewed and a bounded preflight/import pass accepts the manifest.
+          </div>
+        </div>
       </section>
 
       <section className={styles.grid}>
@@ -226,6 +318,22 @@ export default function DatasetSubmissionPage() {
             <strong>Mock persistence boundary</strong>
             The current implementation stores only structured demo data in localStorage under <code>{storageKey}</code>. File upload controls are intentionally represented as source-material inventory fields until controlled storage is wired.
           </div>
+          <div className={styles.queuePanel}>
+            <strong>Local submission queue</strong>
+            {savedSubmissions.length ? (
+              <ul>
+                {savedSubmissions.slice(0, 3).map((item) => (
+                  <li key={item.id}>
+                    <span>{item.id}</span>
+                    <small>{laneCopy[item.lane].label} · {item.readiness?.completed ?? 0}/{item.readiness?.total ?? readinessItems.length} checks · {item.readiness?.modalities?.length ?? 0} modes · {new Date(item.createdAt).toLocaleString()}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No local packets saved in this browser yet.</p>
+            )}
+          </div>
+
         </aside>
       </section>
     </main>

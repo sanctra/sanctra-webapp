@@ -212,3 +212,133 @@
   line-height: 1.6;
   padding-left: 22px;
 }
+
+
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+@media (min-width: 960px) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+  }
+}
+
+.meter {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eadfce;
+  margin: 16px 0;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6f4d38, #3f6f5f);
+  transition: width .2s ease;
+}
+
+.readinessGrid {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .readinessGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.readinessItem {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #eadfce;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .55);
+}
+
+.readinessItem span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #9a5b22;
+  background: #fff3df;
+  font-weight: 900;
+}
+
+.readinessItem strong {
+  color: #2d2520;
+}
+
+.readinessItem p {
+  margin: 3px 0 0;
+  color: #74685f;
+  line-height: 1.45;
+}
+
+.readinessComplete span {
+  color: #3f6f5f;
+  background: #edf7f1;
+}
+
+.warningBox {
+  border: 1px solid #edc98c;
+  border-radius: 18px;
+  padding: 18px;
+  background: #fff3df;
+  color: #6f4d38;
+  line-height: 1.55;
+  margin-top: 16px;
+}
+
+.warningBox strong {
+  display: block;
+  color: #2d2520;
+  margin-bottom: 4px;
+}
+
+.queuePanel {
+  border: 1px solid #eadfce;
+  border-radius: 18px;
+  padding: 16px;
+  margin-top: 16px;
+  background: rgba(255,255,255,.58);
+}
+
+.queuePanel strong {
+  display: block;
+  color: #2d2520;
+  margin-bottom: 8px;
+}
+
+.queuePanel p,
+.queuePanel ul {
+  margin: 0;
+  color: #74685f;
+}
+
+.queuePanel ul {
+  display: grid;
+  gap: 10px;
+  padding-left: 18px;
+}
+
+.queuePanel li span,
+.queuePanel li small {
+  display: block;
+}
+
+.queuePanel li span {
+  color: #4c3325;
+  font-weight: 800;
+}
