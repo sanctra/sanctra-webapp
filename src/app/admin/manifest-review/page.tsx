@@ -13,6 +13,7 @@ import {
   type IntakeManifest,
   type ReviewState,
 } from "@/lib/privateManifestReview";
+import { REVIEW_STATE_GUIDANCE_LIST, getReviewStateGuidance } from "@/lib/reviewStateGuidance";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,12 @@ function formatLane(lane: IntakeManifest["lane"]) {
 }
 
 function stateTone(state: ReviewState) {
-  if (state === "approved" || state === "approved_with_limits") return styles.safe;
-  if (state === "quarantined" || state === "rejected") return styles.danger;
-  return styles.warn;
+  const tone = getReviewStateGuidance(state).tone;
+  if (tone === "ready") return styles.safe;
+  if (tone === "limited") return styles.limited;
+  if (tone === "blocked" || tone === "closed") return styles.danger;
+  if (tone === "caution") return styles.warn;
+  return styles.neutral;
 }
 
 function QueueCard({ manifest }: { manifest: IntakeManifest }) {
@@ -51,7 +55,10 @@ function QueueCard({ manifest }: { manifest: IntakeManifest }) {
       </div>
 
       <div className={styles.chipRow} aria-label={`${manifest.intakeId} review-state counts`}>
-        {REVIEW_STATES.map((state) => <span key={state} className={`${styles.chip} ${stateTone(state)}`}>{state}: {reviewCounts[state]}</span>)}
+        {REVIEW_STATES.map((state) => {
+          const guidance = getReviewStateGuidance(state);
+          return <span key={state} className={`${styles.chip} ${stateTone(state)}`}>{guidance.label}: {reviewCounts[state]}</span>;
+        })}
       </div>
 
       <dl className={styles.metaList}>
@@ -92,8 +99,18 @@ function DetailCard({ manifest }: { manifest: IntakeManifest }) {
                 <p className={styles.kicker}>{item.modality} · {item.id}</p>
                 <h4>{item.label}</h4>
               </div>
-              <span className={`${styles.chip} ${stateTone(item.reviewState)}`}>{item.reviewState}</span>
+              <span className={`${styles.chip} ${stateTone(item.reviewState)}`}>{getReviewStateGuidance(item.reviewState).label}</span>
             </div>
+            {(() => {
+              const guidance = getReviewStateGuidance(item.reviewState);
+              return (
+                <div className={styles.guidanceBox}>
+                  <p><strong>What this state means:</strong> {guidance.reviewerMeaning}</p>
+                  <p><strong>Risk posture:</strong> {guidance.riskPosture}</p>
+                  <p><strong>Safe recovery prompt:</strong> {guidance.recoveryPrompt}</p>
+                </div>
+              );
+            })()}
             <p><strong>Provenance:</strong> {item.provenanceNote}</p>
             <p><strong>Consent:</strong> {item.consentNote}</p>
             <p><strong>Authority:</strong> {item.authorityStatus} · <strong>Identity:</strong> {item.identityConfidence} · <strong>Likeness risk:</strong> {item.likenessRisk}</p>
@@ -101,6 +118,7 @@ function DetailCard({ manifest }: { manifest: IntakeManifest }) {
             <ul className={styles.list} aria-label={`${item.id} privacy and operation flags`}>
               {item.privacyFlags.map((flag) => <li key={flag}>Privacy flag: {flag}</li>)}
               {item.blockedOperations.map((operation) => <li key={operation}>Blocked: {operation}</li>)}
+              {getReviewStateGuidance(item.reviewState).allowedNextActions.map((action) => <li key={action}>Allowed next action: {action}</li>)}
             </ul>
           </article>
         ))}
@@ -147,6 +165,24 @@ export default function ManifestReviewPage() {
         </div>
         <div className={styles.lockGrid}>
           {HARD_LOCKS.map((lock) => <div key={lock} className={styles.lockCard}>{lock}</div>)}
+        </div>
+      </section>
+
+      <section className={styles.stateGuide} aria-labelledby="state-guide-title">
+        <div>
+          <p className={styles.kicker}>Reusable review-state copy</p>
+          <h2 id="state-guide-title">Every state explains meaning, safe next action, and blocked operations.</h2>
+          <p className={styles.subtitle}>These labels are explanatory only. They do not mutate review state, expose raw media, notify anyone, or start provider/storage workflows.</p>
+        </div>
+        <div className={styles.stateGuideGrid}>
+          {REVIEW_STATE_GUIDANCE_LIST.map((guidance) => (
+            <article key={guidance.state} className={styles.stateCard}>
+              <span className={`${styles.chip} ${stateTone(guidance.state)}`}>{guidance.label}</span>
+              <p><strong>Reviewer:</strong> {guidance.reviewerMeaning}</p>
+              <p><strong>Allowed next:</strong> {guidance.allowedNextActions.join("; ")}</p>
+              <p><strong>Still blocked:</strong> {guidance.blockedOperations.join(", ")}</p>
+            </article>
+          ))}
         </div>
       </section>
 

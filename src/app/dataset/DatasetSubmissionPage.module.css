@@ -212,3 +212,9 @@
   line-height: 1.6;
   padding-left: 22px;
 }
+.reviewGuide { margin-bottom: 20px; }
+.reviewGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 14px; }
+.reviewCard { border: 1px solid #eadfce; border-radius: 18px; padding: 14px; background: rgba(255,255,255,.58); }
+.reviewCard p { color: #74685f; line-height: 1.5; margin: 8px 0 0; }
+.danger { color: #a33f36; background: #fff0ef; border-color: #e6b3b0; }
+.limited { color: #5d4b9a; background: #f0edff; border-color: #c7bff0; }

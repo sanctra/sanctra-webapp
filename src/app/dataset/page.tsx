@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./DatasetSubmissionPage.module.css";
+import { REVIEW_STATE_GUIDANCE_LIST } from "@/lib/reviewStateGuidance";
 
 type Lane = "self" | "family";
 type FieldKey = "subjectName" | "submitterName" | "relationship" | "contact" | "authority" | "sourceMaterials" | "contextNotes" | "preferences";
@@ -151,6 +152,24 @@ export default function DatasetSubmissionPage() {
           ))}
         </div>
         <p className={styles.subtitle}>{copy.subtitle}</p>
+      </section>
+
+      <section className={`${styles.card} ${styles.reviewGuide}`} aria-labelledby="review-state-title">
+        <div>
+          <p className={styles.kicker}>After submission</p>
+          <h2 id="review-state-title">Review states explain what is safe next.</h2>
+          <p className={styles.subtitle}>A saved packet is not permission for generation. These are the reusable states Patrick or a reviewer should see after controlled-storage import and metadata review.</p>
+        </div>
+        <div className={styles.reviewGrid}>
+          {REVIEW_STATE_GUIDANCE_LIST.map((guidance) => (
+            <article key={guidance.state} className={styles.reviewCard}>
+              <span className={`${styles.chip} ${guidance.tone === "ready" ? styles.ready : guidance.tone === "blocked" || guidance.tone === "closed" ? styles.danger : guidance.tone === "limited" ? styles.limited : styles.paused}`}>{guidance.label}</span>
+              <p><strong>Meaning:</strong> {guidance.subjectMeaning}</p>
+              <p><strong>Safe next action:</strong> {guidance.allowedNextActions[0]}</p>
+              <p><strong>Blocked:</strong> {guidance.blockedOperations.join(", ")}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className={styles.grid}>

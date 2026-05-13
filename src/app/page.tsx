@@ -7,6 +7,7 @@ import AudioPlayer from "@/components/AudioPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
 import { startSession, sendText, openEvents } from "@/lib/api";
 import { openMicStream } from "@/lib/webrtc";
+import { REVIEW_STATE_GUIDANCE_LIST } from "@/lib/reviewStateGuidance";
 
 type Message = { role: "user" | "agent"; text: string };
 
@@ -62,10 +63,25 @@ export default function HomePage() {
     <main className="p-4 max-w-6xl mx-auto">
       <header className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Sanctra</h1>
-        <nav className="text-sm underline text-blue-700">
+        <nav className="flex flex-wrap gap-3 text-sm underline text-blue-700">
+          <Link href="/dataset">Dataset packet</Link>
           <Link href="/settings">Settings</Link>
         </nav>
       </header>
+
+      <section className="mb-4 rounded border border-amber-200 bg-amber-50 p-4" aria-labelledby="review-guidance-title">
+        <p className="text-xs font-bold uppercase tracking-wide text-amber-800">Review-state safety</p>
+        <h2 id="review-guidance-title" className="mb-2 text-lg font-semibold">Dataset material stays metadata-only until review state allows a bounded next action.</h2>
+        <div className="grid gap-2 md:grid-cols-3">
+          {REVIEW_STATE_GUIDANCE_LIST.map((guidance) => (
+            <article key={guidance.state} className="rounded border border-amber-200 bg-white/70 p-3 text-sm">
+              <h3 className="font-semibold">{guidance.label}</h3>
+              <p className="mt-1 text-gray-700">{guidance.subjectMeaning}</p>
+              <p className="mt-2 text-xs font-medium text-gray-600">Next: {guidance.allowedNextActions[0]}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="grid md:grid-cols-2 gap-4">
         <div className="border rounded p-3">
