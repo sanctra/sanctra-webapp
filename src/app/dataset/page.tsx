@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./DatasetSubmissionPage.module.css";
 
@@ -8,6 +8,19 @@ type Lane = "self" | "family";
 type FieldKey = "subjectName" | "submitterName" | "relationship" | "contact" | "authority" | "sourceMaterials" | "contextNotes" | "preferences";
 type Draft = Record<FieldKey, string> & { consent: boolean; storage: boolean };
 type PacketStep = { title: string; detail: string };
+type Submission = {
+  id: string;
+  lane: Lane;
+  createdAt: string;
+  fields: Draft;
+  persistence: string;
+  reviewerHandoff: {
+    status: "draft_saved";
+    nextAction: string;
+    requiredBeforeReview: string[];
+  };
+};
+type ModalityStatus = "ready" | "needs-detail" | "high-risk";
 
 const emptyDraft: Draft = {
   subjectName: "",
@@ -64,6 +77,46 @@ const packetSteps: PacketStep[] = [
   },
 ];
 
+const modalityChecks: Array<{ key: "text" | "audio" | "image" | "video"; label: string; cue: string; privacy: string; terms: string[]; highRisk?: boolean }> = [
+  {
+    key: "text",
+    label: "Text / documents",
+    cue: "Stories, letters, prompts, transcripts, journals, PDFs, or notes are inventoried with source/date context.",
+    privacy: "Redact third-party names, medical details, addresses, and private family conflict before reviewer handoff.",
+    terms: ["text", "writing", "writings", "story", "stories", "letter", "letters", "journal", "pdf", "doc", "document", "transcript", "note"],
+  },
+  {
+    key: "audio",
+    label: "Audio / voice",
+    cue: "Voice clips identify speaker, recorder/source, date, background speakers/music, and transcript status.",
+    privacy: "Voice likeness remains evaluation-only until explicit likeness consent and single-speaker confidence are reviewed.",
+    terms: ["audio", "voice", "wav", "mp3", "m4a", "recording", "interview", "speaker", "transcript"],
+    highRisk: true,
+  },
+  {
+    key: "image",
+    label: "Images / photos",
+    cue: "Photos include source/owner, approximate date, visible third parties/minors, and whether derivatives are allowed.",
+    privacy: "Keep original images out of this browser draft; derivative crops or avatar references require later review.",
+    terms: ["image", "photo", "portrait", "jpg", "jpeg", "png", "webp", "heic", "face", "picture"],
+  },
+  {
+    key: "video",
+    label: "Video / presence",
+    cue: "Video clips list scene context, speaker confidence, third parties, music, and explicit likeness approval status.",
+    privacy: "Video is the highest-risk modality; default to quarantined unless consent, privacy, and quality gates are explicit.",
+    terms: ["video", "clip", "mp4", "mov", "webm", "gesture", "greeting", "camera"],
+    highRisk: true,
+  },
+];
+
+const reviewRequirements = [
+  "Controlled-storage references or approved upload targets for each real source item.",
+  "Reviewer-visible authority/consent basis and revocation contact.",
+  "Modality-by-modality privacy notes, especially voice/video likeness and third-party exposure.",
+  "A human reviewer decision before package import, training, generated artifacts, or public examples.",
+];
+
 function requiredComplete(draft: Draft) {
   return Boolean(
     draft.subjectName.trim() &&
@@ -77,6 +130,25 @@ function requiredComplete(draft: Draft) {
       draft.consent &&
       draft.storage,
   );
+}
+
+function modalityStatus(draft: Draft, check: (typeof modalityChecks)[number]): ModalityStatus {
+  const inventory = draft.sourceMaterials.toLowerCase();
+  const context = `${draft.contextNotes} ${draft.preferences}`.toLowerCase();
+  const mentioned = check.terms.some((term) => inventory.includes(term));
+  if (!mentioned) return "needs-detail";
+  if (check.highRisk && !/(consent|likeness|single-speaker|single speaker|third-part|privacy|review|quarantine|exclude)/.test(context)) return "high-risk";
+  return "ready";
+}
+
+function packetCompleteness(draft: Draft) {
+  const required: Array<keyof Draft> = ["subjectName", "submitterName", "relationship", "contact", "authority", "sourceMaterials", "contextNotes", "preferences", "consent", "storage"];
+  const complete = required.filter((key) => typeof draft[key] === "boolean" ? draft[key] : String(draft[key]).trim()).length;
+  return Math.round((complete / required.length) * 100);
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function TextField({ id, label, value, placeholder, rows, onChange }: { id: FieldKey; label: string; value: string; placeholder: string; rows?: number; onChange: (key: FieldKey, value: string) => void }) {
@@ -96,8 +168,16 @@ export default function DatasetSubmissionPage() {
   const [lane, setLane] = useState<Lane>("self");
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, authority: laneCopy.self.authority });
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const copy = laneCopy[lane];
   const complete = useMemo(() => requiredComplete(draft), [draft]);
+  const currentModality = useMemo(() => modalityChecks.map((check) => ({ ...check, status: modalityStatus(draft, check) })), [draft]);
+  const currentScore = useMemo(() => packetCompleteness(draft), [draft]);
+
+  useEffect(() => {
+    const existing = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as Submission[];
+    setSubmissions(existing);
+  }, []);
 
   const update = (key: keyof Draft, value: string | boolean) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -120,10 +200,16 @@ export default function DatasetSubmissionPage() {
       createdAt: new Date().toISOString(),
       fields: draft,
       persistence: "localStorage demo boundary only; no production provider call and no external storage upload performed",
+      reviewerHandoff: {
+        status: "draft_saved" as const,
+        nextAction: "Collect controlled-storage references, then route the packet to human preflight review before any import, training, or artifact generation.",
+        requiredBeforeReview: reviewRequirements,
+      },
     };
 
-    const existing = JSON.parse(window.localStorage.getItem(storageKey) || "[]") as unknown[];
-    window.localStorage.setItem(storageKey, JSON.stringify([submission, ...existing].slice(0, 10), null, 2));
+    const nextSubmissions = [submission, ...submissions].slice(0, 10);
+    window.localStorage.setItem(storageKey, JSON.stringify(nextSubmissions, null, 2));
+    setSubmissions(nextSubmissions);
     setSubmitted(submission.id);
   };
 
@@ -160,6 +246,17 @@ export default function DatasetSubmissionPage() {
           <div className={styles.notice}>
             <strong>Submission boundary</strong>
             This page intentionally stops before any production upload or provider call. Saving here creates a local browser draft only, so Patrick can prepare a complete packet without needing secrets or live storage access during intake.
+          </div>
+
+          <div className={styles.dashboard} aria-label="Current packet readiness">
+            <div>
+              <span className={styles.kicker}>Current packet status</span>
+              <strong>{currentScore}% complete</strong>
+              <p>{complete ? "Ready for local demo save; reviewer handoff still requires controlled-storage references." : "Complete every field and acknowledgement before a reviewer can triage this packet."}</p>
+            </div>
+            <div>
+              <span className={`${styles.chip} ${complete ? styles.ready : styles.paused}`}>{complete ? "Draft saved-ready" : "Intake incomplete"}</span>
+            </div>
           </div>
 
           <div className={styles.stepList} aria-label="Submission packet steps">
@@ -205,12 +302,43 @@ export default function DatasetSubmissionPage() {
         </form>
 
         <aside className={styles.card}>
-          <h2>What Patrick should prepare</h2>
-          <p className={styles.subtitle}>Use this checklist before submitting himself or a family-authorized packet through the intended flow.</p>
+          <h2>Packet dashboard</h2>
+          <p className={styles.subtitle}>Use this dashboard to see what is ready, what needs more detail, and what must be routed to human review before Sanctra imports anything.</p>
           <div className={styles.notice}>
             <strong>What remains after this page</strong>
             After Patrick saves a complete packet, the remaining real-data step is controlled-storage review plus the bounded local preflight/import sequence. No realtime, live-avatar, or uncontrolled external upload is part of this intake lane.
           </div>
+          <div className={styles.statusPanel} aria-label="Modality completeness and privacy warnings">
+            {currentModality.map((item) => (
+              <div key={item.key} className={styles.statusItem}>
+                <div className={styles.statusTopline}>
+                  <strong>{item.label}</strong>
+                  <span className={`${styles.chip} ${item.status === "ready" ? styles.ready : item.status === "high-risk" ? styles.danger : styles.paused}`}>{item.status === "ready" ? "Ready note" : item.status === "high-risk" ? "Privacy review" : "Needs detail"}</span>
+                </div>
+                <p>{item.cue}</p>
+                <p className={styles.privacy}>{item.privacy}</p>
+              </div>
+            ))}
+          </div>
+          <h3>Reviewer handoff requirements</h3>
+          <ol className={styles.prepareList}>
+            {reviewRequirements.map((item) => <li key={item}>{item}</li>)}
+          </ol>
+          <h3>Recent local demo submissions</h3>
+          <div className={styles.historyList} aria-live="polite">
+            {submissions.length === 0 ? (
+              <p className={styles.subtitle}>No local submissions saved in this browser yet.</p>
+            ) : submissions.map((item) => (
+              <div key={item.id} className={styles.historyItem}>
+                <strong>{item.fields.subjectName || "Unnamed packet"}</strong>
+                <span>{laneCopy[item.lane].label} · {formatDate(item.createdAt)}</span>
+                <p>{item.reviewerHandoff?.nextAction || "Route to human preflight review before import."}</p>
+              </div>
+            ))}
+          </div>
+
+          <h2>What Patrick should prepare</h2>
+          <p className={styles.subtitle}>Use this checklist before submitting himself or a family-authorized packet through the intended flow.</p>
           <div className={styles.chipRow}>
             <span className={`${styles.chip} ${styles.ready}`}>Identity</span>
             <span className={`${styles.chip} ${styles.ready}`}>Consent / authority</span>
