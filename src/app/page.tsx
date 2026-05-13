@@ -62,7 +62,9 @@ export default function HomePage() {
     <main className="p-4 max-w-6xl mx-auto">
       <header className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Sanctra</h1>
-        <nav className="text-sm underline text-blue-700">
+        <nav className="text-sm underline text-blue-700 flex gap-3">
+          <Link href="/dataset">Dataset</Link>
+          <Link href="/contributor-packet">Contributor packet</Link>
           <Link href="/settings">Settings</Link>
         </nav>
       </header>

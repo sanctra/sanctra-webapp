@@ -137,7 +137,10 @@ export default function DatasetSubmissionPage() {
             Choose whether the subject is submitting directly or a family/authorized person is submitting. This page is a safe local/demo intake boundary: it makes the required contents explicit without calling production providers or external storage.
           </p>
         </div>
-        <Link className={styles.link} href="/">Back to session</Link>
+        <div className={styles.headerLinks}>
+          <Link className={styles.link} href="/contributor-packet">Family contributor packet</Link>
+          <Link className={styles.link} href="/">Back to session</Link>
+        </div>
       </header>
 
       <section className={`${styles.card} ${styles.consent}`} aria-labelledby="lane-title">
