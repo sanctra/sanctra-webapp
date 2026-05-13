@@ -341,3 +341,106 @@ export function unresolvedFlags(manifest: IntakeManifest): string[] {
 export function manifestStorageSummary(manifest: IntakeManifest): string {
   return `${manifest.manifestUri} · ${manifest.manifestHash} · raw object links withheld`;
 }
+
+export type PackageDashboardModality = Modality | "missing";
+
+export type PackageDashboardSummary = {
+  intakeId: string;
+  lane: ManifestLane;
+  subjectLabel: string;
+  submitterLabel: string;
+  submittedAt: string;
+  authorityStatus: AuthorityStatus;
+  manifestRef: string;
+  storageRef: string;
+  modalityCounts: Record<Modality, number>;
+  reviewCounts: Record<ReviewState, number>;
+  readinessGaps: string[];
+  reviewerState: string;
+  blockedOperations: string[];
+  privacyFlags: string[];
+};
+
+export type PackageDashboardData = {
+  source: ManifestQueueSource;
+  sourceLabel: string;
+  summaries: PackageDashboardSummary[];
+};
+
+function redactedManifestRef(manifest: IntakeManifest): string {
+  const lanePrefix = manifest.lane === "live_subject" ? "live-subject" : "family-archive";
+  return `${lanePrefix}/${manifest.intakeId}/server-manifest.json · ${manifest.manifestHash}`;
+}
+
+function redactedStorageRef(manifest: IntakeManifest): string {
+  const lanePrefix = manifest.lane === "live_subject" ? "live-subject" : "family-archive";
+  return `${lanePrefix}/${manifest.intakeId}/ · raw object names withheld`;
+}
+
+function readinessGaps(manifest: IntakeManifest, counts: Record<Modality, number>, reviewCounts: Record<ReviewState, number>): string[] {
+  const gaps: string[] = [];
+  if (manifest.authorityStatus === "needs_authority_review" || manifest.authorityStatus === "disputed") {
+    gaps.push("Authority review must resolve before package release.");
+  }
+  for (const modality of ["text", "audio", "image", "video"] as Modality[]) {
+    if (counts[modality] === 0) gaps.push(`${modality} modality is missing from this packet.`);
+  }
+  if (reviewCounts.needs_review > 0 || reviewCounts.corpus_staged > 0) {
+    gaps.push("Reviewer decisions are still pending for staged items.");
+  }
+  if (reviewCounts.quarantined > 0 || reviewCounts.rejected > 0) {
+    gaps.push("Quarantined or rejected metadata must remain blocked from derived work.");
+  }
+  if (unresolvedFlags(manifest).length > 0) {
+    gaps.push("Privacy, likeness, or third-party flags need explicit reviewer disposition.");
+  }
+  return gaps.length ? gaps : ["Metadata is review-ready for private package handoff; production release remains blocked."];
+}
+
+function reviewerState(reviewCounts: Record<ReviewState, number>): string {
+  const accepted = reviewCounts.approved + reviewCounts.approved_with_limits;
+  const blocked = reviewCounts.quarantined + reviewCounts.rejected;
+  const pending = reviewCounts.corpus_staged + reviewCounts.needs_review;
+  return `${accepted} accepted or limited · ${pending} pending · ${blocked} blocked`;
+}
+
+function summarizePackage(manifest: IntakeManifest): PackageDashboardSummary {
+  const modalityCounts = countByModality(manifest);
+  const reviewCounts = countByReviewState(manifest);
+  return {
+    intakeId: manifest.intakeId,
+    lane: manifest.lane,
+    subjectLabel: manifest.subjectDisplayName,
+    submitterLabel: manifest.submitterDisplayName,
+    submittedAt: manifest.submittedAt,
+    authorityStatus: manifest.authorityStatus,
+    manifestRef: redactedManifestRef(manifest),
+    storageRef: redactedStorageRef(manifest),
+    modalityCounts,
+    reviewCounts,
+    readinessGaps: readinessGaps(manifest, modalityCounts, reviewCounts),
+    reviewerState: reviewerState(reviewCounts),
+    blockedOperations: Array.from(new Set([...manifest.blockedOperations, ...manifest.items.flatMap((item) => item.blockedOperations)])).sort(),
+    privacyFlags: unresolvedFlags(manifest),
+  };
+}
+
+export function loadPackageDashboardData(): PackageDashboardData {
+  const hasConfiguredQueue = Boolean(process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_JSON || process.env.SANCTRA_PRIVATE_MANIFEST_QUEUE_PATH);
+  const explicitFixtureMode = process.env.SANCTRA_PRIVATE_MANIFEST_REVIEW_FIXTURE_MODE === "enabled";
+
+  if (!hasConfiguredQueue && !explicitFixtureMode) {
+    return {
+      source: "fixture_only",
+      sourceLabel: "fixture/local manifest metadata fallback; no live storage read or provider call",
+      summaries: pilotFixtureManifestQueue.map(summarizePackage),
+    };
+  }
+
+  const queue = loadPrivateManifestQueue();
+  return {
+    source: queue.source,
+    sourceLabel: queue.sourceLabel,
+    summaries: queue.manifests.map(summarizePackage),
+  };
+}
