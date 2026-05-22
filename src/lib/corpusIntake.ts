@@ -1,6 +1,13 @@
 export type IntakeLane = "live_subject" | "posthumous_archive";
 export type Modality = "text" | "audio" | "image" | "video" | "document";
-export type ReviewState = "corpus_staged" | "needs_review" | "quarantined";
+export type ReviewState = "corpus_staged" | "needs_review" | "review_approved" | "manifest_eligible" | "quarantined" | "rejected";
+
+export const highPresenceModalities = ["audio", "image", "video"] as const satisfies readonly Modality[];
+export type HighPresenceModality = (typeof highPresenceModalities)[number];
+
+export function isHighPresenceModality(modality: Modality) {
+  return (highPresenceModalities as readonly string[]).includes(modality);
+}
 
 export type IntakeSlot = {
   id: string;
