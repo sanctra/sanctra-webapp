@@ -1,0 +1,35 @@
+:root {
+  --sanctra-ink: #232522;
+  --sanctra-muted: #5e665f;
+  --sanctra-line: #ccd7ce;
+  --sanctra-surface: #f7f8f4;
+  --sanctra-primary: #4d755f;
+  --sanctra-primary-strong: #2f5c46;
+  --sanctra-safe: #24734f;
+  --sanctra-warn: #8a5a13;
+  --sanctra-danger: #9f3734;
+  --sanctra-shadow: 0 12px 28px rgba(29, 41, 33, .1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #eef3ed;
+  color: var(--sanctra-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}

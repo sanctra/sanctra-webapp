@@ -8,7 +8,9 @@ const required = [
   'src/app/dataset/posthumous/page.tsx',
   'src/app/api/corpus-intake/submit/route.ts',
   'src/app/api/admin/manifest-review/route.ts',
+  'src/app/packages/page.tsx',
   'src/lib/corpusIntake.ts',
+  'src/lib/packageControl.ts',
   'src/lib/pilotReviewMutations.ts',
 ];
 const errors = [];
@@ -22,6 +24,8 @@ for (const token of ['live_subject', 'posthumous_archive', 'model_training', 'pr
 const route = fs.existsSync(path.join(root, 'src/app/api/corpus-intake/submit/route.ts')) ? fs.readFileSync(path.join(root, 'src/app/api/corpus-intake/submit/route.ts'), 'utf8') : '';
 const reviewRoute = fs.existsSync(path.join(root, 'src/app/api/admin/manifest-review/route.ts')) ? fs.readFileSync(path.join(root, 'src/app/api/admin/manifest-review/route.ts'), 'utf8') : '';
 const reviewMutations = fs.existsSync(path.join(root, 'src/lib/pilotReviewMutations.ts')) ? fs.readFileSync(path.join(root, 'src/lib/pilotReviewMutations.ts'), 'utf8') : '';
+const packagePage = fs.existsSync(path.join(root, 'src/app/packages/page.tsx')) ? fs.readFileSync(path.join(root, 'src/app/packages/page.tsx'), 'utf8') : '';
+const packageControl = fs.existsSync(path.join(root, 'src/lib/packageControl.ts')) ? fs.readFileSync(path.join(root, 'src/lib/packageControl.ts'), 'utf8') : '';
 const boundary = fs.existsSync(path.join(root, 'src/lib/pilotAccessBoundary.ts')) ? fs.readFileSync(path.join(root, 'src/lib/pilotAccessBoundary.ts'), 'utf8') : '';
 const middleware = fs.existsSync(path.join(root, 'src/middleware.ts')) ? fs.readFileSync(path.join(root, 'src/middleware.ts'), 'utf8') : '';
 for (const token of [
@@ -90,6 +94,26 @@ for (const token of [
   'pilot_admin_manifest_eligibility_confirmed',
 ]) {
   if (!reviewMutations.includes(token)) errors.push(`review mutation boundary missing ${token}`);
+}
+for (const token of [
+  'white_glove',
+  'PackageGate',
+  'ArtifactExpectation',
+  'UTF-8 markdown/plain text plus JSON metadata and provenance',
+  'WAV master, MP3 derivative, loudness/true-peak report, manifest hashes',
+  'Future MP4/H.264 1080p at 24 or 30 fps with AAC 48 kHz audio',
+  'Client view shows safe progress labels',
+  'White-glove workflow uses the same package and manifest records',
+]) {
+  if (!packageControl.includes(token)) errors.push(`package control contract missing ${token}`);
+}
+for (const token of [
+  'Consultant-led memorial package operations',
+  'Client family status view',
+  'Artifact expectations',
+  'Surface rules',
+]) {
+  if (!packagePage.includes(token)) errors.push(`package control page missing ${token}`);
 }
 if (errors.length) {
   console.error('corpus intake contract failed');

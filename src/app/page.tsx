@@ -63,6 +63,7 @@ export default function HomePage() {
       <header className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Sanctra</h1>
         <nav className="text-sm underline text-blue-700 flex gap-3">
+          <Link href="/packages">Package control</Link>
           <Link href="/dataset">Dataset intake</Link>
           <Link href="/settings">Settings</Link>
         </nav>

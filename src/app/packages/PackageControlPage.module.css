@@ -1,0 +1,293 @@
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 20px 56px;
+  color: var(--sanctra-ink);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  color: #47584c;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 0;
+  max-width: 780px;
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.subtitle {
+  max-width: 780px;
+  color: var(--sanctra-muted);
+  line-height: 1.58;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-weight: 800;
+}
+
+.nav a {
+  color: var(--sanctra-primary-strong);
+  text-decoration: none;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.panel,
+.card,
+.clientPanel,
+.ruleBox {
+  border: 1px solid var(--sanctra-line);
+  border-radius: 8px;
+  background: #fbfcf8;
+  box-shadow: var(--sanctra-shadow);
+}
+
+.panel,
+.clientPanel {
+  padding: 18px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--sanctra-line);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #173e2b;
+  background: #dff0e6;
+  border: 1px solid #acd5bd;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.gateGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.gate {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--sanctra-line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ready {
+  color: #135437;
+  background: #e1f2e8;
+}
+
+.waiting {
+  color: #744c11;
+  background: #fff1d4;
+}
+
+.blocked {
+  color: #8a2724;
+  background: #f9dfdc;
+}
+
+.future {
+  color: #475569;
+  background: #e9edf0;
+}
+
+.gate h3,
+.card h3,
+.clientPanel h2,
+.ruleBox h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.gate p,
+.card p,
+.clientPanel p,
+.ruleBox li {
+  color: var(--sanctra-muted);
+  line-height: 1.5;
+}
+
+.action {
+  margin-top: 10px;
+  padding: 10px;
+  border-left: 4px solid var(--sanctra-primary);
+  background: #eef6f0;
+  color: #173e2b;
+  font-weight: 750;
+}
+
+.artifactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.card {
+  padding: 14px;
+}
+
+.cardTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modality {
+  color: #47584c;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.enabled,
+.disabled {
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.enabled {
+  color: #135437;
+  background: #e1f2e8;
+}
+
+.disabled {
+  color: #7a2d2a;
+  background: #f9dfdc;
+}
+
+.ref {
+  overflow-wrap: anywhere;
+  padding: 8px;
+  border-radius: 6px;
+  background: #eff3f0;
+  color: #39463e;
+  font-size: 13px;
+}
+
+.clientPanel {
+  position: sticky;
+  top: 16px;
+}
+
+.phaseList {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.phase {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid var(--sanctra-line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.phase strong {
+  color: var(--sanctra-ink);
+}
+
+.clientStatus {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.clientStatus div {
+  border-radius: 8px;
+  background: #eef6f0;
+  padding: 10px;
+}
+
+.clientStatus strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ruleBox {
+  grid-column: 1 / -1;
+  padding: 18px;
+}
+
+.ruleBox ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 900px) {
+  .header,
+  .workspace,
+  .artifactGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .clientPanel {
+    position: static;
+  }
+
+  .gate,
+  .phase {
+    grid-template-columns: 1fr;
+  }
+
+  .header h1 {
+    font-size: 34px;
+  }
+}
