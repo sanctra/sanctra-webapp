@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { blockedOperations, laneConfigs, type IntakeLane } from "@/lib/corpusIntake";
+import {
+  assertPilotOperationAllowed,
+  hardDisabledPilotOperations,
+  pilotMutationRoles,
+  requirePilotRole,
+} from "@/lib/pilotAccessBoundary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +31,37 @@ function safeName(name: string) {
 
 function jsonResponse(status: number, body: unknown) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function ensurePilotMutationActor(request: NextRequest) {
+  return requirePilotRole(request, pilotMutationRoles, "Pilot admin/reviewer auth is required for real intake mutations.");
+}
+
+function validateManifestFiles(manifest: any, lane: IntakeLane) {
+  const slotsById = new Map(laneConfigs[lane].slots.map((slot) => [slot.id, slot]));
+  const files = Array.isArray(manifest?.files) ? manifest.files : [];
+  if (!files.length) return { ok: false as const, error: "Manifest must describe at least one file slot." };
+
+  for (const entry of files) {
+    const slotId = String(entry?.slot_id || "");
+    const slot = slotsById.get(slotId);
+    if (!slot) return { ok: false as const, error: `Unknown slot_id ${slotId || "(missing)"} for ${lane}.` };
+    if (entry?.modality !== slot.modality) return { ok: false as const, error: `${slotId} modality must remain ${slot.modality}.` };
+    if (entry?.review_state !== slot.reviewState) return { ok: false as const, error: `${slotId} review_state must remain ${slot.reviewState} until reviewer action.` };
+    if (entry?.training_allowed === true) return { ok: false as const, error: `${slotId} cannot enable training_allowed in pilot intake.` };
+    if (entry?.derived_dataset_ready === true) return { ok: false as const, error: `${slotId} cannot mark derived_dataset_ready in pilot intake.` };
+    if (typeof entry?.storage_uri === "string" && entry.storage_uri !== "pending_server_upload") {
+      return { ok: false as const, error: `${slotId} storage_uri must stay pending_server_upload until the server assigns storage.` };
+    }
+  }
+
+  return { ok: true as const };
+}
+
+function hasAllBlockedOperations(value: unknown) {
+  if (!Array.isArray(value)) return false;
+  const configured = new Set(value.filter((item): item is string => typeof item === "string"));
+  return blockedOperations.every((op) => configured.has(op));
 }
 
 async function uploadObject(token: string, objectName: string, bytes: ArrayBuffer | Buffer, contentType: string) {
@@ -57,6 +94,9 @@ async function uploadObject(token: string, objectName: string, bytes: ArrayBuffe
 }
 
 export async function POST(request: NextRequest) {
+  const actorResult = ensurePilotMutationActor(request);
+  if ("error" in actorResult) return actorResult.error;
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -78,6 +118,28 @@ export async function POST(request: NextRequest) {
   if (!lane || !laneConfigs[lane]) return jsonResponse(400, { ok: false, error: "Invalid intake lane." });
   if (manifest?.schema_version !== "sanctra.corpus_intake.v0") return jsonResponse(400, { ok: false, error: "Unsupported manifest schema_version." });
   if (manifest?.consent_authority?.consent_checked_in_ui !== true) return jsonResponse(400, { ok: false, error: "Consent/authority acknowledgement is required." });
+  if (!hasAllBlockedOperations(manifest?.consent_authority?.blocked_operations)) {
+    return jsonResponse(400, { ok: false, error: "Consent policy must preserve the pilot blocked-operations set." });
+  }
+  if (!hasAllBlockedOperations(manifest?.corpus_policy?.blocked_operations)) {
+    return jsonResponse(400, { ok: false, error: "Corpus policy must preserve the pilot blocked-operations set." });
+  }
+  for (const operation of hardDisabledPilotOperations) {
+    const gate = assertPilotOperationAllowed(operation);
+    if (gate.ok) continue;
+    if (
+      manifest?.corpus_policy?.[operation] === true ||
+      manifest?.consent_authority?.[operation] === true ||
+      manifest?.gates?.[operation] === true
+    ) {
+      return jsonResponse(400, { ok: false, error: gate.error });
+    }
+  }
+  if (manifest?.corpus_policy?.training_requires_later_explicit_gate !== true) {
+    return jsonResponse(400, { ok: false, error: "Pilot corpus policy must keep training behind a later explicit gate." });
+  }
+  const manifestValidation = validateManifestFiles(manifest, lane);
+  if (!manifestValidation.ok) return jsonResponse(400, { ok: false, error: manifestValidation.error });
 
   const files = form.getAll("files").filter((entry): entry is File => entry instanceof File);
   if (!files.length) return jsonResponse(400, { ok: false, error: "At least one corpus file is required." });
@@ -86,8 +148,9 @@ export async function POST(request: NextRequest) {
   }
 
   const intakeId = String(manifest.intake_id || `corpus:${lane}:${Date.now()}`).replace(/[^a-zA-Z0-9:._-]+/g, "-");
+  const receivedAt = new Date().toISOString();
   const token = await getAccessToken();
-  const base = `${prefix}/${lane}/${intakeId}/${new Date().toISOString().replace(/[:.]/g, "-")}`;
+  const base = `${prefix}/${lane}/${intakeId}/${receivedAt.replace(/[:.]/g, "-")}`;
   const uploaded: Array<{
     slot_id: string;
     original_filename: string;
@@ -115,22 +178,42 @@ export async function POST(request: NextRequest) {
     ...manifest,
     project_id: projectId,
     corpus_bucket: bucket,
-    server_received_at: new Date().toISOString(),
+    server_received_at: receivedAt,
+    pilot_submission_state: "submitted_for_review",
     storage_root: `gs://${bucket}/${base}`,
     files: (manifest.files || []).map((entry: any, index: number) => ({
       ...entry,
       storage_uri: uploaded[index]?.storage_uri || entry.storage_uri,
       gcs_object: uploaded[index]?.gcs?.name,
+      review_state: laneConfigs[lane].slots.find((slot) => slot.id === entry.slot_id)?.reviewState || entry.review_state,
       training_allowed: false,
       derived_dataset_ready: false,
     })),
     uploaded_files: uploaded,
+    audit_log: [
+      {
+        event: "pilot_intake_submitted",
+        actor_id: actorResult.actor.actorId,
+        actor_role: actorResult.actor.role,
+        timestamp: receivedAt,
+        lane,
+        intake_id: intakeId,
+        authority_basis: manifest?.submitter?.role || "unknown_submitter_role",
+        consent_scope: "private_review_only",
+        prior_state: "draft",
+        new_state: "submitted_for_review",
+        decision_reason: "Pilot intake accepted for internal review-gated storage only.",
+        admin_confirmation_required: false,
+        admin_confirmation_performed: actorResult.actor.role === "pilot_admin",
+      },
+    ],
     gates: {
       corpus_schema_review_required: true,
       dataset_shape_review_required: true,
       human_review_required: true,
       training_requires_later_explicit_gate: true,
-      blocked_operations: [...blockedOperations],
+      release_requires_two_person_control: true,
+      blocked_operations: [...new Set([...blockedOperations, ...hardDisabledPilotOperations])],
     },
   };
 
