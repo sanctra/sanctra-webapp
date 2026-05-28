@@ -6,9 +6,12 @@ const root = process.cwd();
 const required = [
   'src/app/dataset/live/page.tsx',
   'src/app/dataset/posthumous/page.tsx',
+  'src/app/admin/manifest-review/page.tsx',
   'src/app/api/corpus-intake/submit/route.ts',
   'src/app/api/admin/manifest-review/route.ts',
   'src/lib/corpusIntake.ts',
+  'src/lib/manifestReviewBrowser.ts',
+  'src/lib/manifestReviewLedger.ts',
   'src/lib/pilotReviewMutations.ts',
 ];
 const errors = [];
@@ -22,6 +25,9 @@ for (const token of ['live_subject', 'posthumous_archive', 'model_training', 'pr
 const route = fs.existsSync(path.join(root, 'src/app/api/corpus-intake/submit/route.ts')) ? fs.readFileSync(path.join(root, 'src/app/api/corpus-intake/submit/route.ts'), 'utf8') : '';
 const reviewRoute = fs.existsSync(path.join(root, 'src/app/api/admin/manifest-review/route.ts')) ? fs.readFileSync(path.join(root, 'src/app/api/admin/manifest-review/route.ts'), 'utf8') : '';
 const reviewMutations = fs.existsSync(path.join(root, 'src/lib/pilotReviewMutations.ts')) ? fs.readFileSync(path.join(root, 'src/lib/pilotReviewMutations.ts'), 'utf8') : '';
+const reviewBrowser = fs.existsSync(path.join(root, 'src/lib/manifestReviewBrowser.ts')) ? fs.readFileSync(path.join(root, 'src/lib/manifestReviewBrowser.ts'), 'utf8') : '';
+const reviewLedger = fs.existsSync(path.join(root, 'src/lib/manifestReviewLedger.ts')) ? fs.readFileSync(path.join(root, 'src/lib/manifestReviewLedger.ts'), 'utf8') : '';
+const reviewPage = fs.existsSync(path.join(root, 'src/app/admin/manifest-review/page.tsx')) ? fs.readFileSync(path.join(root, 'src/app/admin/manifest-review/page.tsx'), 'utf8') : '';
 const boundary = fs.existsSync(path.join(root, 'src/lib/pilotAccessBoundary.ts')) ? fs.readFileSync(path.join(root, 'src/lib/pilotAccessBoundary.ts'), 'utf8') : '';
 const middleware = fs.existsSync(path.join(root, 'src/middleware.ts')) ? fs.readFileSync(path.join(root, 'src/middleware.ts'), 'utf8') : '';
 for (const token of [
@@ -68,14 +74,69 @@ for (const token of [
   if (!route.includes(token)) errors.push(`upload route missing ${token}`);
 }
 for (const token of [
+  'GET',
+  'listPilotManifestReviews',
+  'pilotReadRoles',
   'applyPilotReviewMutation',
   'pilotReviewRoles',
   'Pilot reviewer/admin auth is required',
   'audit_log_entry',
+  'manifest_object',
+  'slot_id',
+  'entry_generation',
+  'ledger_generation',
+  'appendManifestReviewLedgerRecord',
+  'Review ledger generation changed',
   'high_presence_two_person_gate_enforced',
   'provider_training_publish_release_disabled',
 ]) {
   if (!reviewRoute.includes(token)) errors.push(`manifest review route missing ${token}`);
+}
+for (const token of [
+  'storage.googleapis.com/storage/v1',
+  'manifest/sanctra-corpus-intake-manifest.json',
+  'alt", "media"',
+  'file_slots',
+  'blocked_operations',
+  'audit_summary',
+  'readManifestReviewLedger',
+  'ledger_object',
+  'ledger_generation',
+  'projectLedgerRecords',
+  'model_training: false',
+  'provider_finetune: false',
+  'provider_call: false',
+  'avatar_runtime_deployment: false',
+  'public_delivery: false',
+  'publish_release: false',
+  'derived_dataset_release: false',
+]) {
+  if (!reviewBrowser.includes(token)) errors.push(`manifest review browser missing ${token}`);
+}
+for (const token of [
+  'sanctra-manifest-review-ledger.ndjson',
+  'ifGenerationMatch',
+  'application/x-ndjson',
+  'decision_id',
+  'manifest_object',
+  'hard_disabled_operations',
+  'training_allowed: false',
+  'derived_dataset_ready: false',
+]) {
+  if (!reviewLedger.includes(token)) errors.push(`manifest review ledger missing ${token}`);
+}
+for (const token of [
+  'Manifest review',
+  'Metadata-only intake browser',
+  'Raw corpus bodies',
+  'Blocked operations',
+  'Decision reason',
+  'Admin confirm',
+  'ledger_generation',
+  'training off',
+  'derived dataset off',
+]) {
+  if (!reviewPage.includes(token)) errors.push(`manifest review page missing ${token}`);
 }
 for (const token of [
   'reviewer_approve',

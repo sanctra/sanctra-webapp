@@ -32,6 +32,25 @@ export type PilotReviewMutationInput = {
   now?: string;
 };
 
+export type PilotReviewAudit = {
+  event: "pilot_reviewer_mutation" | "pilot_admin_manifest_eligibility_confirmed";
+  actor_id: string;
+  actor_role: PilotActor["role"];
+  timestamp: string;
+  action: PilotReviewAction;
+  slot_id: string;
+  modality: Modality;
+  prior_state: ReviewState;
+  new_state: ReviewState;
+  decision_reason: string;
+  manifest_eligible: boolean;
+  admin_confirmation_required: boolean;
+  admin_confirmation_performed: boolean;
+  reviewer_actor_id?: string | null;
+  training_allowed: false;
+  derived_dataset_ready: false;
+};
+
 const reviewerActions = new Set<PilotReviewAction>([
   "reviewer_approve",
   "reviewer_request_changes",
@@ -92,7 +111,7 @@ export function applyPilotReviewMutation(input: PilotReviewMutationInput) {
       ok: true as const,
       entry: nextEntry,
       audit: {
-        event: "pilot_reviewer_mutation",
+        event: "pilot_reviewer_mutation" as const,
         actor_id: actor.actorId,
         actor_role: actor.role,
         timestamp,
@@ -105,9 +124,9 @@ export function applyPilotReviewMutation(input: PilotReviewMutationInput) {
         manifest_eligible: false,
         admin_confirmation_required: action === "reviewer_approve" && highPresence,
         admin_confirmation_performed: false,
-        training_allowed: false,
-        derived_dataset_ready: false,
-      },
+        training_allowed: false as const,
+        derived_dataset_ready: false as const,
+      } satisfies PilotReviewAudit,
     };
   }
 
@@ -130,7 +149,7 @@ export function applyPilotReviewMutation(input: PilotReviewMutationInput) {
     ok: true as const,
     entry: nextEntry,
     audit: {
-      event: "pilot_admin_manifest_eligibility_confirmed",
+      event: "pilot_admin_manifest_eligibility_confirmed" as const,
       actor_id: actor.actorId,
       actor_role: actor.role,
       timestamp,
@@ -138,14 +157,14 @@ export function applyPilotReviewMutation(input: PilotReviewMutationInput) {
       slot_id: entry.slot_id,
       modality: entry.modality,
       prior_state: entry.review_state,
-      new_state: "manifest_eligible",
+      new_state: "manifest_eligible" as ReviewState,
       decision_reason: reason,
       manifest_eligible: true,
       admin_confirmation_required: highPresence,
       admin_confirmation_performed: true,
       reviewer_actor_id: entry.last_reviewed_by || null,
-      training_allowed: false,
-      derived_dataset_ready: false,
-    },
+      training_allowed: false as const,
+      derived_dataset_ready: false as const,
+    } satisfies PilotReviewAudit,
   };
 }
