@@ -291,4 +291,85 @@
   .manifestHeader {
     display: grid;
   }
+
+  .shell {
+    padding-inline: 16px;
+  }
+
+  .slotTable {
+    overflow-x: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .slotTable table,
+  .slotTable thead,
+  .slotTable tbody,
+  .slotTable tr,
+  .slotTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .slotTable table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .slotTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .slotTable tr {
+    border: 1px solid #e1e7e4;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .slotTable tr + tr {
+    margin-top: 12px;
+  }
+
+  .slotTable td {
+    display: grid;
+    grid-template-columns: minmax(88px, .42fr) minmax(0, 1fr);
+    gap: 10px;
+    padding: 11px 12px;
+  }
+
+  .slotTable td::before {
+    content: attr(data-label);
+    color: #64706f;
+    font-size: 11px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .slotTable td[data-label="Storage metadata"],
+  .slotTable td[data-label="Decision"] {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .decisionForm {
+    min-width: 0;
+  }
+
+  .actionRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actionRow button {
+    width: 100%;
+    min-height: 36px;
+  }
 }

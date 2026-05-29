@@ -106,19 +106,19 @@ function ManifestCard({ manifest }: { manifest: ManifestReviewSummary }) {
           <tbody>
             {manifest.file_slots.map((slot) => (
               <tr key={`${slot.slot_id}:${slot.storage_uri}`}>
-                <td><strong>{slot.slot_id}</strong></td>
-                <td>{slot.modality}</td>
-                <td>{slot.review_state}</td>
-                <td>{slot.original_filename || "not recorded"}</td>
-                <td>{slot.size_bytes === null ? "not recorded" : `${slot.size_bytes.toLocaleString()} bytes`}</td>
-                <td>
+                <td data-label="Slot"><strong>{slot.slot_id}</strong></td>
+                <td data-label="Modality">{slot.modality}</td>
+                <td data-label="Review state">{slot.review_state}</td>
+                <td data-label="Original file">{slot.original_filename || "not recorded"}</td>
+                <td data-label="Size">{slot.size_bytes === null ? "not recorded" : `${slot.size_bytes.toLocaleString()} bytes`}</td>
+                <td data-label="Storage metadata">
                   <div className={styles.mono}>{slot.storage_uri || slot.gcs_object || "not recorded"}</div>
                   {slot.training_allowed === false && <span className={styles.offPill}>training off</span>}{" "}
                   {slot.derived_dataset_ready === false && <span className={styles.offPill}>derived dataset off</span>}
                   {slot.last_reviewed_by && <div className={styles.mono}>reviewer: {slot.last_reviewed_by}</div>}
                   {slot.last_admin_confirmed_by && <div className={styles.mono}>admin: {slot.last_admin_confirmed_by}</div>}
                 </td>
-                <td><SlotDecisionForm manifest={manifest} slot={slot} /></td>
+                <td data-label="Decision"><SlotDecisionForm manifest={manifest} slot={slot} /></td>
               </tr>
             ))}
           </tbody>
