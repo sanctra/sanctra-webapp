@@ -143,6 +143,181 @@ export type ManifestReviewBrowserResult = {
 const bucket = process.env.SANCTRA_CORPUS_BUCKET || "sanctra-corpus-intake";
 const prefix = (process.env.SANCTRA_CORPUS_PREFIX || "pilot-corpus").replace(/^\/+|\/+$/g, "");
 const manifestSuffix = "/manifest/sanctra-corpus-intake-manifest.json";
+const qaFixtureEnabled = process.env.NODE_ENV !== "production" && process.env.SANCTRA_MANIFEST_REVIEW_QA_FIXTURE === "1";
+const qaFixtureManifestObject = "pilot-corpus/local-qa/live-subject-qa/manifest/sanctra-corpus-intake-manifest.json";
+const qaFixtureObject: GcsObject = {
+  bucket,
+  name: qaFixtureManifestObject,
+  size: "2876",
+  contentType: "application/json",
+  updated: "2026-05-29T16:00:00.000Z",
+  generation: "qa-fixture-manifest-generation-1",
+};
+const qaFixtureLedger: Awaited<ReturnType<typeof readManifestReviewLedger>> = {
+  object: "pilot-corpus/local-qa/live-subject-qa/review/sanctra-manifest-review-ledger.ndjson",
+  generation: "qa-fixture-ledger-generation-2",
+  raw: "",
+  records: [
+    {
+      decision_id: "qa-fixture:text-corpus:reviewer_approve",
+      manifest_object: qaFixtureManifestObject,
+      intake_id: "corpus:local-qa:manifest-review",
+      slot_id: "text-corpus",
+      modality: "text",
+      prior_state: "needs_review",
+      new_state: "review_approved",
+      actor_id: "qa-reviewer-001",
+      actor_role: "pilot_reviewer",
+      timestamp: "2026-05-29T16:05:00.000Z",
+      action: "reviewer_approve",
+      decision_reason: "Metadata-only fixture approval for screenshot QA.",
+      admin_confirmation_required: false,
+      admin_confirmation_performed: false,
+      reviewer_actor_id: null,
+      manifest_eligible: false,
+      training_allowed: false,
+      derived_dataset_ready: false,
+      hard_disabled_operations: hardDisabledPilotOperations,
+    },
+    {
+      decision_id: "qa-fixture:audio-corpus:reviewer_approve",
+      manifest_object: qaFixtureManifestObject,
+      intake_id: "corpus:local-qa:manifest-review",
+      slot_id: "audio-corpus",
+      modality: "audio",
+      prior_state: "needs_review",
+      new_state: "review_approved",
+      actor_id: "qa-reviewer-001",
+      actor_role: "pilot_reviewer",
+      timestamp: "2026-05-29T16:07:00.000Z",
+      action: "reviewer_approve",
+      decision_reason: "High-presence metadata approved by reviewer; separate admin confirmation remains required.",
+      admin_confirmation_required: true,
+      admin_confirmation_performed: false,
+      reviewer_actor_id: null,
+      manifest_eligible: false,
+      training_allowed: false,
+      derived_dataset_ready: false,
+      hard_disabled_operations: hardDisabledPilotOperations,
+    },
+    {
+      decision_id: "qa-fixture:image-corpus:admin_confirm_manifest_eligible",
+      manifest_object: qaFixtureManifestObject,
+      intake_id: "corpus:local-qa:manifest-review",
+      slot_id: "image-corpus",
+      modality: "image",
+      prior_state: "review_approved",
+      new_state: "manifest_eligible",
+      actor_id: "qa-admin-002",
+      actor_role: "pilot_admin",
+      timestamp: "2026-05-29T16:10:00.000Z",
+      action: "admin_confirm_manifest_eligible",
+      decision_reason: "Separate admin confirmed metadata-only manifest eligibility for fixture proof.",
+      admin_confirmation_required: true,
+      admin_confirmation_performed: true,
+      reviewer_actor_id: "qa-reviewer-001",
+      manifest_eligible: true,
+      training_allowed: false,
+      derived_dataset_ready: false,
+      hard_disabled_operations: hardDisabledPilotOperations,
+    },
+  ],
+};
+const qaFixtureManifest: IntakeManifest = {
+  schema_version: "sanctra.corpus_intake.v0",
+  intake_id: "corpus:local-qa:manifest-review",
+  lane: "live_subject",
+  subject: {
+    display_name: "Local QA Subject",
+    subject_status: "living_subject",
+    subject_ref: "subject:local_qa_manifest_review",
+  },
+  submitter: {
+    display_name: "Local QA Harness",
+    role: "pilot_operator_readonly",
+    relationship_to_subject: "fixture",
+  },
+  storage_root: "gs://sanctra-corpus-intake/pilot-corpus/local-qa/live-subject-qa",
+  server_received_at: "2026-05-29T16:00:00.000Z",
+  created_at: "2026-05-29T15:55:00.000Z",
+  pilot_submission_state: "submitted_for_review",
+  files: [
+    {
+      slot_id: "text-corpus",
+      modality: "text",
+      original_filename: "qa-writing-metadata.txt",
+      content_type: "text/plain",
+      size_bytes: 1842,
+      review_state: "needs_review",
+      storage_uri: "gs://sanctra-corpus-intake/pilot-corpus/local-qa/live-subject-qa/text/qa-writing-metadata.txt",
+      gcs_object: "pilot-corpus/local-qa/live-subject-qa/text/qa-writing-metadata.txt",
+      training_allowed: false,
+      derived_dataset_ready: false,
+    },
+    {
+      slot_id: "audio-corpus",
+      modality: "audio",
+      original_filename: "qa-voice-sample-metadata.wav",
+      content_type: "audio/wav",
+      size_bytes: 482144,
+      review_state: "needs_review",
+      storage_uri: "gs://sanctra-corpus-intake/pilot-corpus/local-qa/live-subject-qa/audio/qa-voice-sample-metadata.wav",
+      gcs_object: "pilot-corpus/local-qa/live-subject-qa/audio/qa-voice-sample-metadata.wav",
+      training_allowed: false,
+      derived_dataset_ready: false,
+    },
+    {
+      slot_id: "image-corpus",
+      modality: "image",
+      original_filename: "qa-portrait-metadata.jpg",
+      content_type: "image/jpeg",
+      size_bytes: 214988,
+      review_state: "review_approved",
+      storage_uri: "gs://sanctra-corpus-intake/pilot-corpus/local-qa/live-subject-qa/image/qa-portrait-metadata.jpg",
+      gcs_object: "pilot-corpus/local-qa/live-subject-qa/image/qa-portrait-metadata.jpg",
+      training_allowed: false,
+      derived_dataset_ready: false,
+      last_reviewed_by: "qa-reviewer-001",
+    },
+    {
+      slot_id: "video-corpus",
+      modality: "video",
+      original_filename: "qa-presence-clip-metadata.mp4",
+      content_type: "video/mp4",
+      size_bytes: 1288992,
+      review_state: "quarantined",
+      storage_uri: "gs://sanctra-corpus-intake/pilot-corpus/local-qa/live-subject-qa/video/qa-presence-clip-metadata.mp4",
+      gcs_object: "pilot-corpus/local-qa/live-subject-qa/video/qa-presence-clip-metadata.mp4",
+      training_allowed: false,
+      derived_dataset_ready: false,
+      last_reviewed_by: "qa-reviewer-001",
+    },
+  ],
+  audit_log: [
+    {
+      event: "fixture_manifest_seeded",
+      actor_id: "local-qa-harness",
+      actor_role: "pilot_operator_readonly",
+      timestamp: "2026-05-29T16:00:00.000Z",
+      decision_reason: "Local/dev-only screenshot fixture; metadata-only values.",
+      new_state: "submitted_for_review",
+    },
+  ],
+  gates: {
+    blocked_operations: ["provider_call", "provider_finetune", "model_training", "publish_release", "derived_dataset_release"],
+    corpus_schema_review_required: true,
+    dataset_shape_review_required: true,
+    human_review_required: true,
+    training_requires_later_explicit_gate: true,
+    release_requires_two_person_control: true,
+  },
+  consent_authority: {
+    blocked_operations: ["public_delivery", "avatar_runtime_deployment"],
+  },
+  corpus_policy: {
+    blocked_operations: ["model_training", "provider_finetune", "publish_release", "derived_dataset_release"],
+  },
+};
 
 function asSize(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -293,6 +468,15 @@ async function downloadManifest(token: string, objectName: string) {
 
 export async function getPilotManifestReview(manifestObject: string) {
   const normalized = manifestObject.replace(/^\/+/, "");
+  if (qaFixtureEnabled && normalized === qaFixtureManifestObject) {
+    return {
+      token: "local-qa-fixture-token",
+      manifest: qaFixtureManifest,
+      object: qaFixtureObject,
+      ledger: qaFixtureLedger,
+      summary: summarizeManifest(qaFixtureManifest, qaFixtureObject, qaFixtureLedger),
+    };
+  }
   const token = await getAccessToken();
   const metadataUrl = new URL(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(normalized)}`);
   const metadataResponse = await fetch(metadataUrl, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
@@ -318,6 +502,19 @@ export function getPilotManifestReviewBucket() {
 }
 
 export async function listPilotManifestReviews(): Promise<ManifestReviewBrowserResult> {
+  if (qaFixtureEnabled) {
+    const manifests = [summarizeManifest(qaFixtureManifest, qaFixtureObject, qaFixtureLedger)];
+    return {
+      ok: true,
+      bucket,
+      prefix: "local-qa-fixture",
+      storage_root: `gs://${bucket}/pilot-corpus/local-qa`,
+      manifest_count: manifests.length,
+      generated_at: "2026-05-29T16:15:00.000Z",
+      disabled_operations: hardDisabledPilotOperations,
+      manifests,
+    };
+  }
   const token = await getAccessToken();
   const objects = await listManifestObjects(token);
   const manifests = await Promise.all(objects.map(async (object) => {

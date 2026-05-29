@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:corpus-intake": "node scripts/validate-corpus-intake-contract.mjs"
+    "test:corpus-intake": "node scripts/validate-corpus-intake-contract.mjs",
+    "capture:manifest-review-fixtures": "node scripts/capture-manifest-review-fixtures.mjs"
   },
   "dependencies": {
     "next": "14.2.5",

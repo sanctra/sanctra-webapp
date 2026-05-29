@@ -110,6 +110,9 @@ for (const token of [
   'public_delivery: false',
   'publish_release: false',
   'derived_dataset_release: false',
+  'SANCTRA_MANIFEST_REVIEW_QA_FIXTURE',
+  'NODE_ENV !== "production"',
+  'local-qa-fixture',
 ]) {
   if (!reviewBrowser.includes(token)) errors.push(`manifest review browser missing ${token}`);
 }
@@ -135,6 +138,8 @@ for (const token of [
   'ledger_generation',
   'training off',
   'derived dataset off',
+  'High-presence manifest eligibility requires a separate admin',
+  'local/dev-only fixture state',
 ]) {
   if (!reviewPage.includes(token)) errors.push(`manifest review page missing ${token}`);
 }

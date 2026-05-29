@@ -95,6 +95,27 @@
   font-size: 22px;
 }
 
+.controlNotice {
+  border: 1px solid #cbdad6;
+  border-left: 4px solid #557c76;
+  border-radius: 8px;
+  background: #f4f8f7;
+  padding: 12px 14px;
+}
+
+.controlNotice strong {
+  display: block;
+  color: #21302e;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.controlNotice p {
+  margin: 0;
+  color: #4f5d5b;
+  line-height: 1.5;
+}
+
 .metaGrid,
 .gateGrid {
   display: grid;

@@ -4,6 +4,10 @@ import styles from "./ManifestReviewPage.module.css";
 
 export const dynamic = "force-dynamic";
 
+function qaFixtureEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.SANCTRA_MANIFEST_REVIEW_QA_FIXTURE === "1";
+}
+
 function formatDate(value: string | null) {
   if (!value) return "Not recorded";
   const date = new Date(value);
@@ -81,6 +85,11 @@ function ManifestCard({ manifest }: { manifest: ManifestReviewSummary }) {
         <ReviewStatePills states={manifest.review_states} />
       </section>
 
+      <section className={styles.controlNotice}>
+        <strong>Admin confirmation gate</strong>
+        <p>High-presence manifest eligibility requires a separate admin from the reviewer decision actor. Two-person control remains enforced before any manifest can become eligible; training, provider calls, publish, release, and derived dataset actions remain disabled.</p>
+      </section>
+
       <section className={styles.slotTable} aria-label={`${manifest.intake_id} file slots`}>
         <table>
           <thead>
@@ -133,9 +142,10 @@ function ManifestCard({ manifest }: { manifest: ManifestReviewSummary }) {
   );
 }
 
-export default async function ManifestReviewPage() {
+export default async function ManifestReviewPage({ searchParams }: { searchParams?: { qa_state?: string } }) {
   let result: Awaited<ReturnType<typeof listPilotManifestReviews>> | null = null;
   let error: string | null = null;
+  const showQaConflictState = qaFixtureEnabled() && searchParams?.qa_state === "conflict";
   try {
     result = await listPilotManifestReviews();
   } catch (caught) {
@@ -158,6 +168,12 @@ export default async function ManifestReviewPage() {
       </header>
 
       {error && <section className={styles.error}><strong>Manifest listing unavailable</strong><p>{error}</p></section>}
+      {showQaConflictState && (
+        <section className={styles.error}>
+          <strong>Deterministic QA conflict state</strong>
+          <p>Review ledger generation changed; refresh before retrying. This local/dev-only fixture state exercises the same optimistic-concurrency message without touching live GCS data.</p>
+        </section>
+      )}
 
       {result && (
         <>
