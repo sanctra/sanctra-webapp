@@ -6,7 +6,19 @@ import styles from "./CuratePage.module.css";
 
 type Lane = "self" | "family";
 type StepKey = "consent" | "text" | "audio" | "image" | "video" | "review";
-type PromptStatus = "draft" | "captured" | "submitted" | "approved_with_limits" | "quarantined" | "revoked";
+type PromptStatus =
+  | "draft"
+  | "captured"
+  | "submitted"
+  | "recorded"
+  | "uploaded"
+  | "derivative_pending"
+  | "inventory_only"
+  | "metadata_captured"
+  | "identity_review_needed"
+  | "approved_with_limits"
+  | "quarantined"
+  | "revoked";
 type PromptCard = {
   id: string;
   step: Exclude<StepKey, "consent" | "review">;
@@ -32,6 +44,40 @@ const steps: Array<{ key: StepKey; label: string; helper: string }> = [
   { key: "video", label: "Video", helper: "Gestures, eye line, consent reminder" },
   { key: "review", label: "Review", helper: "Coverage, reuse scope, blocked gaps" },
 ];
+
+const guidedCurationContract = {
+  route: "/curate",
+  lanes: ["living_subject_guided", "family_archive_guided"],
+  progressSteps: ["consent", "text", "audio", "image", "video", "review"],
+  mockedResponseStates: {
+    living_subject_guided: {
+      text: ["draft", "captured", "submitted", "approved_with_limits"],
+      audio: ["draft", "recorded", "submitted", "approved_with_limits"],
+      image: ["draft", "uploaded", "derivative_pending"],
+      video: ["draft", "recorded", "quarantined"],
+    },
+    family_archive_guided: {
+      text: ["draft", "captured", "submitted"],
+      audio: ["draft", "inventory_only", "quarantined"],
+      image: ["draft", "metadata_captured", "approved_with_limits"],
+      video: ["draft", "identity_review_needed", "quarantined"],
+    },
+  },
+  packageSummarySections: [
+    "coverage_by_modality",
+    "coverage_by_life_value_relationship_category",
+    "reusable_scope",
+    "quarantined_items",
+    "readiness_gaps",
+    "revocation_path",
+  ],
+  followUpBoundaries: [
+    "bulk_uploader_not_implemented_in_this_slice",
+    "processor_sanitation_not_implemented_in_this_slice",
+    "no_provider_calls",
+    "no_raw_media_persistence",
+  ],
+} as const;
 
 const laneCopy: Record<Lane, { title: string; description: string; authority: string; warning: string }> = {
   self: {
@@ -59,27 +105,32 @@ const baseConsent: ConsentControl[] = [
 const selfPrompts: PromptCard[] = [
   { id: "text-values", step: "text", title: "Values and principles", prompt: "What principles did you try to live by, even when it was hard?", guidance: "Write naturally; include phrases or sayings people associate with you.", status: "captured", privacy: "family", quality: "Good style signal; needs review before training reuse." },
   { id: "text-boundaries", step: "text", title: "Non-impersonation boundaries", prompt: "What should this avatar never say, imply, or pretend to know?", guidance: "Include no-current-awareness limits, topics to refuse, and people/situations to avoid.", status: "submitted", privacy: "private", quality: "Required guardrail prompt captured." },
-  { id: "audio-reassurance", step: "audio", title: "Comfort in your own voice", prompt: "Speak to someone you love who is grieving, scared, or unsure.", guidance: "Quiet room, no music, 30–90 seconds, natural pauses. Mocked recorder state only.", status: "approved_with_limits", privacy: "family", quality: "Enough for cadence demo; not enough for voice clone threshold." },
-  { id: "image-front", step: "image", title: "Everyday front-facing reference", prompt: "Add a clear portrait with normal hairstyle, glasses, and expression.", guidance: "Original preserved; derivative crop/review job would be separate.", status: "draft", privacy: "private", quality: "Image capture waiting on real storage seam." },
+  { id: "audio-reassurance", step: "audio", title: "Comfort in your own voice", prompt: "Speak to someone you love who is grieving, scared, or unsure.", guidance: "Quiet room, no music, 30–90 seconds, natural pauses. Mocked recorder state only.", status: "recorded", privacy: "family", quality: "Enough for cadence demo; not enough for voice clone threshold." },
+  { id: "image-front", step: "image", title: "Everyday front-facing reference", prompt: "Add a clear portrait with normal hairstyle, glasses, and expression.", guidance: "Original preserved; derivative crop/review job would be separate.", status: "uploaded", privacy: "private", quality: "Mocked upload state proves metadata flow without raw media persistence." },
   { id: "video-greeting", step: "video", title: "Warm greeting clip", prompt: "Record a short greeting and repeat what uses are allowed.", guidance: "Stable camera, good light, quiet room, no copyrighted background media.", status: "quarantined", privacy: "excluded", quality: "Quarantined until explicit video consent and quality gates exist." },
 ];
 
 const familyPrompts: PromptCard[] = [
   { id: "text-authority", step: "text", title: "Authority and relationship note", prompt: "Who are you to the subject, and what authority or family agreement lets you submit this?", guidance: "Name limitations, dissent, and who can approve or revoke.", status: "captured", privacy: "private", quality: "Authority basis captured; would require reviewer confirmation." },
   { id: "text-relationship", step: "text", title: "Relationship-specific context", prompt: "For each intended person, what would they need to hear and what should never be said to them?", guidance: "Separate private, shared-family, and excluded context.", status: "submitted", privacy: "family", quality: "Good relationship fixture; needs conflict review." },
-  { id: "audio-archive", step: "audio", title: "Archive voice inventory", prompt: "List clean voice clips, source dates, other speakers, and any background music/noise.", guidance: "Do not upload files here; describe controlled-storage candidates.", status: "draft", privacy: "private", quality: "Waiting for controlled packet; no provider calls." },
-  { id: "image-archive", step: "image", title: "Photo provenance inventory", prompt: "Which images represent the subject clearly and who else appears in them?", guidance: "Flag minors, third parties, private events, and disputed images.", status: "captured", privacy: "family", quality: "Provenance metadata starts here; derivative crop later." },
-  { id: "video-archive", step: "video", title: "Video identity confidence", prompt: "Inventory short clips with face, voice, date/context, and speaker confidence.", guidance: "Preserve originals; any segments/transcripts are derivative jobs.", status: "draft", privacy: "private", quality: "Insufficient for video readiness without reviewer packet." },
+  { id: "audio-archive", step: "audio", title: "Archive voice inventory", prompt: "List clean voice clips, source dates, other speakers, and any background music/noise.", guidance: "Do not upload files here; describe controlled-storage candidates.", status: "inventory_only", privacy: "private", quality: "Waiting for controlled packet; no provider calls." },
+  { id: "image-archive", step: "image", title: "Photo provenance inventory", prompt: "Which images represent the subject clearly and who else appears in them?", guidance: "Flag minors, third parties, private events, and disputed images.", status: "metadata_captured", privacy: "family", quality: "Provenance metadata starts here; derivative crop later." },
+  { id: "video-archive", step: "video", title: "Video identity confidence", prompt: "Inventory short clips with face, voice, date/context, and speaker confidence.", guidance: "Preserve originals; any segments/transcripts are derivative jobs.", status: "identity_review_needed", privacy: "private", quality: "Insufficient for video readiness without reviewer packet." },
 ];
+
+const stepByKey = steps.reduce<Record<StepKey, (typeof steps)[number]>>((acc, step) => {
+  acc[step.key] = step;
+  return acc;
+}, {} as Record<StepKey, (typeof steps)[number]>);
 
 function statusLabel(status: PromptStatus) {
   return status.replaceAll("_", " ");
 }
 
 function statusClass(status: PromptStatus) {
-  if (status === "captured" || status === "submitted") return styles.ready;
-  if (status === "approved_with_limits") return styles.limited;
-  if (status === "quarantined" || status === "revoked") return styles.blocked;
+  if (["captured", "submitted", "recorded", "uploaded", "metadata_captured"].includes(status)) return styles.ready;
+  if (["approved_with_limits", "derivative_pending", "inventory_only", "identity_review_needed"].includes(status)) return styles.limited;
+  if (["quarantined", "revoked"].includes(status)) return styles.blocked;
   return styles.draft;
 }
 
@@ -117,10 +168,11 @@ function PromptCardView({ card }: { card: PromptCard }) {
 export default function CuratePage() {
   const [lane, setLane] = useState<Lane>("self");
   const [activeStep, setActiveStep] = useState<StepKey>("consent");
+  const contractLane = lane === "self" ? "living_subject_guided" : "family_archive_guided";
   const prompts = lane === "self" ? selfPrompts : familyPrompts;
   const visiblePrompts = useMemo(() => prompts.filter((card) => card.step === activeStep), [activeStep, prompts]);
   const counts = useMemo(() => ({
-    captured: prompts.filter((p) => ["captured", "submitted", "approved_with_limits"].includes(p.status)).length,
+    captured: prompts.filter((p) => ["captured", "submitted", "recorded", "uploaded", "metadata_captured", "approved_with_limits"].includes(p.status)).length,
     blocked: prompts.filter((p) => ["quarantined", "revoked"].includes(p.status)).length,
     draft: prompts.filter((p) => p.status === "draft").length,
   }), [prompts]);
@@ -149,7 +201,7 @@ export default function CuratePage() {
       <section className={styles.workspace}>
         <aside className={styles.sidebar} aria-label="Curation progress">
           <p className={styles.kicker}>Progress</p>
-          {steps.map((step) => (
+          {guidedCurationContract.progressSteps.map((stepKey) => stepByKey[stepKey]).map((step) => (
             <button key={step.key} type="button" className={`${styles.stepButton} ${activeStep === step.key ? styles.active : ""}`} onClick={() => setActiveStep(step.key)}>
               <span>{step.label}</span>
               <small>{step.helper}</small>
@@ -159,6 +211,7 @@ export default function CuratePage() {
             <strong>Mock package status</strong>
             <p>{counts.captured} captured/submitted · {counts.draft} draft · {counts.blocked} blocked</p>
             <p className={styles.guardrail}>{laneCopy[lane].warning}</p>
+            <p>Active contract: {contractLane}</p>
           </div>
         </aside>
 
@@ -178,6 +231,7 @@ export default function CuratePage() {
               <p className={styles.kicker}>{activeStep} prompt cards</p>
               <h2>Guided prompts, not a generic text box</h2>
               <div className={styles.promptGrid}>{visiblePrompts.map((card) => <PromptCardView key={card.id} card={card} />)}</div>
+              <div className={styles.schemaNote}><strong>Mocked modality states</strong> {JSON.stringify(guidedCurationContract.mockedResponseStates[contractLane][activeStep as Exclude<StepKey, "consent" | "review">])}</div>
             </>
           )}
 
@@ -192,6 +246,7 @@ export default function CuratePage() {
                 <div><strong>Next slice boundary</strong><p>Bulk uploader comes next; sanitation/processor follows after upload metadata and authority capture are proven.</p></div>
               </div>
               <div className={styles.schemaNote}><strong>Non-impersonation lock</strong> Prompt fixtures must train the product to say it is a memorial echo, never claim current awareness, never invent memories, and never speak as literal presence.</div>
+              <div className={styles.schemaNote}><strong>Prototype boundary</strong> no_provider_calls · no_raw_media_persistence · bulk_uploader_not_implemented_in_this_slice · processor_sanitation_not_implemented_in_this_slice</div>
             </>
           )}
         </section>
