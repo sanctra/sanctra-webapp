@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:corpus-intake": "node scripts/validate-corpus-intake-contract.mjs",
     "test:curate-contract": "node scripts/validate-curate-contract.mjs",
+    "test:interaction-shell": "node scripts/validate-interaction-shell-contract.mjs",
     "capture:manifest-review-fixtures": "node scripts/capture-manifest-review-fixtures.mjs"
   },
   "dependencies": {

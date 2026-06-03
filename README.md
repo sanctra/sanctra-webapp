@@ -1,15 +1,32 @@
 # sanctra-webapp
 
-Next.js 14 app with tri-modal interaction:
-- Text chat pane and video pane
-- WebRTC mic capture; streams audio to Orchestrator /turn
-- Shows interim transcript, plays WAV immediately, swaps to MP4 when notified via SSE
-- Simple settings page to choose a persona
+Next.js 14 app with a completed-avatar interaction shell:
+- Web-first private interaction surface for an approved avatar package
+- Text turn submission and static avatar presentation now
+- Client-safe package interaction profile with disclosure labels and modality gates
+- Speech-to-speech voice and full-motion video held behind deferred adapter seams
+- Review feedback capture for family corrections and escalation flags
+
+This slice follows `SANCTRA_INTERACTION_APP_PLATFORM_CONTRACT_CON-2454_2026-06-03.md`.
+Corpus/biography submission remains in the concierge/package-authoring lane; the interaction screen does not add self-serve ingest.
+
+## Interaction API seam
+
+- `GET /api/packages/{packageId}/interaction-profile`
+- `POST /api/interaction-sessions`
+- `POST /api/interaction-sessions/{sessionId}/turns`
+- `POST /api/interaction-sessions/{sessionId}/feedback`
+
+When `NEXT_PUBLIC_ORCHESTRATOR_HTTP` is configured, text turns can proxy to the existing orchestrator `/turn` primitive. Voice/video provider integrations remain out of scope for this bounded shell.
 
 ## Quickstart
 npm install
 copy .env.example .env
 npm run dev
+
+## Contract checks
+npm run test:curate-contract
+npm run test:interaction-shell
 
 ## Env
 - NEXT_PUBLIC_ORCHESTRATOR_HTTP=https://orchestrator.example.com

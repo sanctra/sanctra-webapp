@@ -1,0 +1,29 @@
+{
+  "issue": "CON-2456",
+  "status": "implemented",
+  "run_id": "8306c998-b015-42d5-ae33-d9c208128d7b",
+  "implemented_routes": [
+    "/",
+    "/api/packages/[packageId]/interaction-profile",
+    "/api/interaction-sessions",
+    "/api/interaction-sessions/[sessionId]/turns",
+    "/api/interaction-sessions/[sessionId]/feedback"
+  ],
+  "allowed_modalities": ["text", "image"],
+  "deferred_modalities": ["voice", "video"],
+  "validation": [
+    "npm run test:interaction-shell",
+    "npm run test:curate-contract",
+    "npx tsc --noEmit --pretty false",
+    "npm run build",
+    "curl smoke: home/profile/session/turn/feedback"
+  ],
+  "playwright_status": "blocked_missing_chrome_runtime",
+  "out_of_scope_preserved": [
+    "provider voice/video integrations",
+    "full ingestion pipeline",
+    "self-serve corpus or biography submission",
+    "generated media artifacts",
+    "GCP deploy automation"
+  ]
+}
